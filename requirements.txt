@@ -1,5 +1,7 @@
 numpy
-opencv-python-headless
+opencv-python
 pillow
 tesserocr
-imutils
+pyserial
+flask
+flask-socketio

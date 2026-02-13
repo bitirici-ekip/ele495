@@ -1,88 +1,125 @@
-# PNP Machine Control & Camera OCR System
+# PNP Control Center v2.0 🎯
 
-Bu proje, GRBL tabanlı bir Pick and Place (PNP) makinesini kontrol etmek ve entegre kamera sistemi ile gerçek zamanlı Optik Karakter Tanıma (OCR) yapmak için geliştirilmiştir.
+**Professional Pick & Place Machine Control Interface**
 
-## Özellikler
+![Status](https://img.shields.io/badge/Status-Active-success)
+![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
+![Flask](https://img.shields.io/badge/Backend-Flask-green)
+![GRBL](https://img.shields.io/badge/CNC-GRBL-orange)
 
-### 1. **PNP Kontrolcü (`main.py`)**
-- GRBL uyumlu CNC/Robot kollarını otomatik olarak tanır ve bağlanır.
-- G-Code komutlarını senkronize bir şekilde gönderir (Okuma/Yazma teyidi ile).
-- Önceden tanımlanmış senaryoları (Al-Götür-Bırak) uygular.
-- **Güvenlik Özellikleri**:
-  - Pompa açma/kapama işlemlerinde buffer temizliği (`G4 P0`).
-  - Hata durumunda otomatik temizlik ve kapanış.
-  - Z ekseni güvenlik hareketleri.
+Development of a comprehensive control interface for a Pick and Place (PNP) machine, integrating real-time camera streaming, OCR-based component detection, and precise motor control via GRBL.
 
-### 2. **Kamera & OCR Sistemi (`camera_ocr.py`)**
-- **Donanım**: Raspberry Pi Camera Module 3 (IMX708) ile uyumlu `Picamera2` kütüphanesi kullanır.
-- **OCR Motoru**: Tesseract 5.0 (C++ API wrapper `tesserocr`) kullanarak yüksek performanslı metin tanıma yapar.
-- **Görüntü İşleme**:
-  - Görüntüyü otomatik döndürme (90 derece).
-  - Gri tonlama (Grayscale) ve Adaptive Thresholding ile metin netleştirme.
-  - Titremeyi önleyen (anti-flicker) stabilizasyon algoritması (`STABILITY_DURATION`).
-  - Nesne takibi ve eşleştirme logic'i (`IOU_MATCH_THRESHOLD`).
+## 🚀 Features
 
-## Kurulum
+- **Real-time Monitoring**: High-quality MJPEG stream from the machine's camera.
+- **OCR Component Detection**: Utilizing `tesserocr` to identify components (e.g., chips, labels) on the PCB.
+- **Auto-Centering**: 
+  - Automatically center the camera on a specific target word.
+  - Supports dynamic target word input.
+  - Two-stage centering (Coarse & Fine) for high precision.
+- **Manual Control**:
+  - Full X/Y/Z axis control via UI buttons or keyboard shortcuts.
+  - Pump (Vacuum) toggle.
+  - Emergency Stop & Soft Reset.
+- **Configuration & Calibration**:
+  - Easy-to-use calibration wizard for camera-motor alignment.
+  - Customize resolution, feed rates, and target words directly from the UI.
+- **Professional UI**:
+  - Modern, dark-themed interface built with responsive CSS.
+  - Central pop-up notifications for improved user feedback.
 
-Bu proje Raspberry Pi (Bookworm OS veya üzeri) üzerinde çalışacak şekilde tasarlanmıştır.
+## 🛠️ Installation
 
-### Sistem Gereksinimleri
-Aşağıdaki paketleri terminal üzerinden yükleyin:
+### Prerequisites
 
-```bash
-sudo apt update
-sudo apt install tesseract-ocr libtesseract-dev libleptonica-dev
-sudo apt install python3-libcamera python3-kms++ libcamera-apps
+- **Python 3.9+**
+- **Tesseract OCR** (System dependency)
+  ```bash
+  sudo apt-get install tesseract-ocr libtesseract-dev libleptonica-dev
+  ```
+
+### Setup
+
+1.  **Clone the Repository**
+    ```bash
+    git clone https://github.com/bitirici-ekip/ele495.git
+    cd ele495
+    ```
+
+2.  **Create Virtual Environment**
+    ```bash
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
+
+3.  **Install Dependencies**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## ▶️ Usage
+
+1.  **Start the Application**
+    ```bash
+    python app.py
+    ```
+    *The server will start on port 5000 by default.*
+
+2.  **Access the Web Interface**
+    Open your browser and navigate to:
+    `http://localhost:5000` (or the Raspberry Pi's IP address)
+
+3.  **Login**
+    - **Username**: `admin`
+    - **Password**: `admin`
+
+## 🎮 Controls
+
+### Keyboard Shortcuts
+
+| Key | Action |
+| :--- | :--- |
+| **Arrow Keys** | Move X/Y Axis |
+| **Page Up/Down** | Move Z Axis |
+| **H** | Home Machine ($H) |
+| **C** | Start Auto-Center |
+| **E** | Emergency Stop |
+
+### OCR & Auto-Center
+
+1.  Go to the **OCR Tab** to view detected words.
+2.  Add new target words if needed.
+3.  In the **Control Tab**, type the target word into the "HEDEF KELİME" input.
+4.  Click **MERKEZLE** to automatically move the machine until the target is centered.
+
+## ⚙️ Configuration
+
+Settings are saved in `config.json`. You can modify these via the **Settings Tab** in the UI:
+- **Pixel-to-MM Ratio**: Calibrate for accurate movement.
+- **Camera Resolution**: Default 800x1080.
+- **Motor Directions**: Invert axes if necessary.
+
+## 📂 Project Structure
+
+```
+├── app.py              # Main Application Entry Point (Flask + Logic)
+├── config.json         # Persistent Configuration
+├── requirements.txt    # Python Dependencies
+├── static/
+│   ├── app.js          # Frontend Logic (SocketIO, UI interactions)
+│   └── style.css       # Professional Dark Theme Styling
+└── templates/
+    ├── index.html      # Main Dashboard
+    └── login.html      # Login Page
 ```
 
-### Python Kütüphaneleri
-Proje dizininde sanal ortam oluşturup kütüphaneleri yükleyin:
+## 🤝 Contribution
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+1.  Fork the repository.
+2.  Create your feature branch (`git checkout -b feature/AmazingFeature`).
+3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
+4.  Push to the branch (`git push origin feature/AmazingFeature`).
+5.  Open a Pull Request.
 
-*Not: `tesserocr` kurulumu sırasında derleme hatası alırsanız sistem paketlerinin tam yüklü olduğundan emin olun.*
-
-## Kullanım
-
-### Tüm Sistemi Başlatma
-PNP makinesini ve Kamera sistemini aynı anda başlatmak için:
-
-```bash
-python main.py
-```
-Bu komut:
-1. PNP portunu bulur ve bağlanır (`/dev/ttyUSB*` veya `/dev/ttyACM*`).
-2. Kamerayı açar ve ekranda canlı görüntü verir.
-3. PNP senaryosunu arka planda çalıştırmaya başlar.
-
-### Sadece Kamerayı Test Etme
-Sadece görüntü işleme ve OCR performansını görmek için:
-
-```bash
-python camera_ocr.py
-```
-Çıkmak için: `q` tuşuna basın veya pencereyi kapatın.
-
-## Konfigürasyon (`camera_ocr.py`)
-
-Kamera performansını ortam ışığına göre optimize etmek için şu parametreleri düzenleyebilirsiniz:
-
-- **`STABILITY_DURATION`** (Varsayılan: 0.1s): Bir metin tespit edildikten sonra ekranda en az ne kadar kalacağını belirler. Titremeyi önler.
-- **`IOU_MATCH_THRESHOLD`** (Varsayılan: 0.4): Ardışık karelerdeki kutuların aynı nesne olup olmadığına karar veren eşik değeridir.
-
-## Proje Yapısı
-
-```
-.
-├── main.py            # Ana kontrol dosyası (PNP + Kamera Thread)
-├── camera_ocr.py      # Görüntü işleme ve OCR modülü
-├── requirements.txt   # Python bağımlılıkları
-└── README.md          # Proje dokümantasyonu
-```
-
-## Lisans
-Bu proje ELE495 Bitirme Projesi kapsamında geliştirilmiştir.
+---
+*Developed by Bitirici Ekip for ELE495.*
