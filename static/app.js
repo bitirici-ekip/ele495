@@ -1,5 +1,6 @@
 /* PNP Kontrol Merkezi — app.js */
-let moveStep = 1.0, socket = null;
+let moveStep = 5.0, socket = null, pumpState = false;
+const STEPS = [0.1, 0.5, 1.0, 5.0, 10, 50];
 const MAX_LOG = 300;
 
 /* ═══ INIT ═══ */
@@ -91,7 +92,7 @@ function updateMotor(d) {
 function updateGrblState(state, alarm) {
     const s = state.toUpperCase();
     let cls = s.includes('ALARM') ? 'alarm' : s.includes('RUN') ? 'run' : (s.includes('HOLD') || s.includes('HOME') || s.includes('SLEEP')) ? 'hold' : 'idle';
-    ['grblBadge', 'grblSm'].forEach(id => { const e = $(id); if (e) { e.textContent = s; e.className = (id === 'grblBadge' ? 'grbl-badge ' : 'grbl-sm ') + cls; } });
+    ['grblBadge'].forEach(id => { const e = $(id); if (e) { e.textContent = s; e.className = (id === 'grblBadge' ? 'grbl-badge ' : 'grbl-sm ') + cls; } });
     const bar = $('alarmBar'); bar.classList.toggle('show', alarm === true);
 }
 
@@ -145,6 +146,28 @@ function showToast(msg, level = 'error') {
 /* ═══ API ═══ */
 async function moveMotor(dx, dy) { try { const r = await api('/api/move', { x: dx * moveStep, y: dy * moveStep }); if (r.motor) updateMotor(r.motor); } catch (e) { addC('Hareket hatası: ' + e, 'error'); showToast('Hareket hatası: ' + e); } }
 async function moveZ(dz) { try { const r = await api('/api/move', { x: 0, y: 0, z: dz * moveStep }); if (r.motor) updateMotor(r.motor); } catch (e) { addC('Z hatası: ' + e, 'error'); } }
+
+async function moveToZ() {
+    const inp = $('zTargetInput');
+    const zVal = parseFloat(inp.value);
+
+    if (isNaN(zVal)) { showToast('Geçersiz Z değeri!', 'error'); return; }
+
+    showOverlay('İndiriliyor...');
+    try {
+        const res = await api('/api/move_z_absolute', { z: zVal });
+        if (res.success) {
+            showToast('Z hareketi tamamlandı.', 'info');
+            if (res.motor) updateMotor(res.motor);
+        } else {
+            showToast('Z hareketi başarısız!', 'error');
+        }
+    } catch (e) {
+        showToast('Hata: ' + e, 'error');
+    } finally {
+        hideOverlay();
+    }
+}
 async function homeMotor() {
     addC('Home gönderiliyor...', 'info');
     showOverlay('Home Konumuna Gidiliyor...');
@@ -152,6 +175,14 @@ async function homeMotor() {
     if (!r.success) { showToast(r.message || 'Home hatası'); showOverlay('Home Hatası!'); setTimeout(hideOverlay, 3000); }
     else { setTimeout(hideOverlay, 5000); }
 }
+function setInputAndCenter(text) {
+    const inp = $('targetInput');
+    if (inp) {
+        inp.value = text;
+        startAutoCenter();
+    }
+}
+
 function startAutoCenter() {
     const inp = $('targetInput');
     const word = inp ? inp.value.trim().toUpperCase() : "";
@@ -160,18 +191,22 @@ function startAutoCenter() {
     api('/api/auto_center', { target_word: word }, 'POST');
 }
 async function pumpCtl(on) {
+    pumpState = on;
     addC(`Pompa ${on ? 'açılıyor' : 'kapatılıyor'}...`, 'info');
     showOverlay(on ? 'Pompa AÇIK' : 'Pompa KAPALI');
     const r = await api('/api/pump', { state: on });
     addC(r.message, 'info');
     setTimeout(hideOverlay, 1500);
 }
-async function emergencyStop() {
-    addC('🚨 ACİL DURDURMA!', 'error');
-    showOverlay('⚠️ ACİL DURDURMA ⚠️');
-    showToast('ACİL DURDURMA aktif!', 'error');
-    await api('/api/emergency_stop');
-    setTimeout(hideOverlay, 3000);
+function togglePump() { pumpCtl(!pumpState); }
+async function shutdownServer() {
+    if (!confirm('Sunucuyu kapatmak istediğinizden emin misiniz? Python kodu tamamen duracak.')) return;
+    addC('🔌 Sunucu kapatılıyor...', 'error');
+    showOverlay('⚠️ SUNUCU KAPATILIYOR ⚠️');
+    showToast('Sunucu kapatılıyor...', 'error');
+    try {
+        await api('/api/shutdown');
+    } catch (e) { /* bağlantı kapandığında hata normal */ }
 }
 async function unlockGrbl() { addC('Kilit açılıyor...', 'info'); const r = await api('/api/unlock'); addC(r.message, r.success ? 'info' : 'error'); if (!r.success) showToast(r.message); }
 async function softReset() { addC('Soft Reset...', 'info'); const r = await api('/api/soft_reset'); addC(r.message, r.success ? 'info' : 'error'); if (!r.success) showToast(r.message); }
@@ -201,11 +236,45 @@ function applyConfig(c) {
     if (c.camera_height !== undefined) { $('camH').value = c.camera_height; }
     if (c.camera_width && c.camera_height) { $('camResBadge').textContent = c.camera_width + '×' + c.camera_height; }
     updateCalSummary();
+    // OCR Settings
+    if (c.ocr_confidence !== undefined) { $('cfgOcrConf').value = c.ocr_confidence; $('cfgOcrConfVal').textContent = c.ocr_confidence; }
+    if (c.ocr_psm_mode !== undefined) { $('cfgOcrPsm').value = c.ocr_psm_mode; }
+    if (c.ocr_whitelist !== undefined) { $('cfgOcrWhitelist').value = c.ocr_whitelist; }
+    if (c.zoom_factor !== undefined) {
+        const zs = $('zoomSlider');
+        if (zs) {
+            zs.value = c.zoom_factor;
+            $('zoomVal').textContent = 'x' + parseFloat(c.zoom_factor).toFixed(1);
+        }
+    }
+    if (c.ocr_min_word_length !== undefined) {
+        const el = $('cfgMinWordLen');
+        if (el) el.value = c.ocr_min_word_length;
+    }
+    if (c.box_growth_limit !== undefined) {
+        const el = $('cfgBoxGrowth');
+        if (el) el.value = c.box_growth_limit;
+    }
+    if (c.auto_home !== undefined) {
+        const el = $('cfgAutoHome');
+        if (el) el.checked = c.auto_home;
+    }
 }
 async function loadConfig() { try { const r = await fetch('/api/config').then(r => r.json()); applyConfig(r); } catch (e) { } }
 async function saveConfig() {
     const r = await api('/api/config', { pixel_to_mm_x: +$('cfgPxX').value, pixel_to_mm_y: +$('cfgPxY').value, target_x: +$('cfgTX').value, target_y: +$('cfgTY').value, auto_center_tolerance: +$('cfgTol').value, auto_center_max_iter: +$('cfgMaxIter').value, feed_rate: +$('cfgFeed').value, invert_x: $('cfgIX').checked, invert_y: $('cfgIY').checked });
     addC('Kalibrasyon kaydedildi.', 'info'); showToast('Ayarlar kaydedildi', 'info');
+}
+async function saveOcrConfig() {
+    const r = await api('/api/config', {
+        ocr_confidence: +$('cfgOcrConf').value,
+        ocr_psm_mode: +$('cfgOcrPsm').value,
+        ocr_whitelist: $('cfgOcrWhitelist').value.toUpperCase(),
+        ocr_min_word_length: +$('cfgMinWordLen').value,
+        box_growth_limit: +$('cfgBoxGrowth').value,
+        auto_home: $('cfgAutoHome').checked
+    });
+    addC('OCR ayarları kaydedildi.', 'info'); showToast('OCR ayarları kaydedildi', 'info');
 }
 
 /* ═══ OCR WORDS & GROUPS ═══ */
@@ -341,7 +410,17 @@ function renderErrors(errs) {
 async function clearErrors() { await api('/api/errors/clear'); $('errorList').innerHTML = '<div class="ocr-empty">Hata yok ✓</div>'; addC('Hata geçmişi temizlendi.', 'info'); }
 
 /* ═══ STEP ═══ */
+/* ═══ STEP ═══ */
 function setStep(s) { moveStep = s; document.querySelectorAll('.sb').forEach(b => b.classList.toggle('active', parseFloat(b.textContent) === s)); }
+function changeStep(dir) {
+    let idx = STEPS.indexOf(moveStep);
+    if (idx < 0) idx = 3; // Default to 5.0 if not found
+    let n = idx + dir;
+    if (n < 0) n = 0;
+    if (n >= STEPS.length) n = STEPS.length - 1;
+    setStep(STEPS[n]);
+    showToast('Adım: ' + STEPS[n] + 'mm', 'info');
+}
 
 /* ═══ POLLING ═══ */
 function pollGrbl() { fetch('/api/grbl_status').then(r => r.json()).then(d => updateMotor(d)).catch(() => { }); }
@@ -361,9 +440,14 @@ document.addEventListener('keydown', (e) => {
         case 'ArrowRight': e.preventDefault(); moveMotor(1, 0); break;
         case 'PageUp': e.preventDefault(); moveZ(1); break;
         case 'PageDown': e.preventDefault(); moveZ(-1); break;
+        case 'w': case 'W': moveZ(1); break;
+        case 's': case 'S': moveZ(-1); break;
+        case 'q': case 'Q': changeStep(-1); break;
+        case 'e': case 'E': changeStep(1); break;
+        case ' ': e.preventDefault(); togglePump(); break;
         case 'h': case 'H': homeMotor(); break;
         case 'c': case 'C': autoCenter(); break;
-        case 'e': case 'E': emergencyStop(); break;
+        // case 'e': case 'E': shutdownServer(); break;
     }
 });
 
@@ -527,9 +611,105 @@ async function saveCalibration() {
 }
 
 
+/* ═══ BASES ═══ */
+async function loadBases() {
+    try {
+        const r = await fetch('/api/bases').then(res => res.json());
+        renderBases(r.bases || []);
+    } catch (e) { console.error('Bases load error', e); }
+}
+
+function renderBases(list) {
+    // Render Table List
+    const cont = $('baseList');
+    if (!list.length) {
+        cont.innerHTML = '<div class="ocr-empty">Kayıtlı konum yok.</div>';
+    } else {
+        let h = '<table style="width:100%; border-collapse:collapse; font-size:0.9rem">';
+        h += '<tr style="border-bottom:1px solid #444; text-align:left; color:#aaa"><th style="padding:4px">İsim</th><th>X</th><th>Y</th><th>Z</th><th></th></tr>';
+        list.forEach(b => {
+            h += `<tr style="border-bottom:1px solid #333">
+                <td style="padding:8px">${esc(b.name)}</td>
+                <td>${b.x}</td><td>${b.y}</td><td>${b.z}</td>
+                <td style="text-align:right">
+                    <button class="btn-sm" style="background:#d32f2f;color:#fff" onclick="deleteBase('${esc(b.name)}')">Sil</button>
+                    <button class="btn-sm" style="background:#1976d2;color:#fff" onclick="gotoBaseDirect('${esc(b.name)}')">Git</button>
+                </td>
+             </tr>`;
+        });
+        h += '</table>';
+        cont.innerHTML = h;
+    }
+
+    // Render Dropdown
+    const sel = $('quickBaseSel');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Seç...</option>' + list.map(b => `<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('');
+    if (cur && list.find(b => b.name === cur)) sel.value = cur;
+}
+
+async function saveBase() {
+    const name = $('baseName').value.trim();
+    if (!name) { showToast('İsim gerekli!', 'error'); return; }
+    const x = parseFloat($('baseX').value) || 0;
+    const y = parseFloat($('baseY').value) || 0;
+    const z = parseFloat($('baseZ').value) || 0;
+
+    const r = await api('/api/bases', { name, x, y, z });
+    if (r.success) {
+        showToast('Konum kaydedildi.', 'info');
+        renderBases(r.bases);
+        $('baseName').value = ''; // clear name
+    } else {
+        showToast('Hata: ' + r.message, 'error');
+    }
+}
+
+async function deleteBase(name) {
+    if (!confirm(name + ' silinsin mi?')) return;
+    const r = await fetch('/api/bases/' + name, { method: 'DELETE' }).then(res => res.json());
+    if (r.success) {
+        showToast('Konum silindi.', 'info');
+        renderBases(r.bases);
+    } else {
+        showToast('Hata: ' + r.message, 'error');
+    }
+}
+
+function fetchCurrentPos() {
+    $('baseX').value = $('posX').textContent;
+    $('baseY').value = $('posY').textContent;
+    $('baseZ').value = $('posZ').textContent;
+}
+
+async function gotoBase() {
+    const name = $('quickBaseSel').value;
+    if (!name) return;
+    gotoBaseDirect(name);
+}
+
+async function gotoBaseDirect(name) {
+    showOverlay(name + ' konumuna gidiliyor...');
+    const r = await api('/api/goto_base', { name });
+    hideOverlay();
+    if (r.success) {
+        showToast(r.message, 'info');
+        addC(r.message, 'success');
+    } else {
+        showToast('Hata: ' + r.message, 'error');
+        addC('Hata: ' + r.message, 'error');
+    }
+}
+
+async function setZoom(val) {
+    const v = parseFloat(val);
+    $('zoomVal').textContent = 'x' + v.toFixed(1);
+    await api('/api/config', { zoom_factor: v });
+}
+
 /* ═══ HELPERS ═══ */
 function $(id) { return document.getElementById(id); }
-function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+function esc(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
 async function api(url, body) { const o = body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { method: 'POST' }; return fetch(url, o).then(r => r.json()); }
 function setBadge(bid, tid, txt, st) { $(bid).className = 'badge ' + (st === 'ok' ? 'ok' : st === 'warn' ? 'warn' : 'err'); $(tid).textContent = txt; }
 
@@ -541,3 +721,6 @@ function hideOverlay() {
     const el = document.getElementById('camOverlayText');
     if (el) el.style.display = 'none';
 }
+
+// Init
+loadBases();

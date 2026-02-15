@@ -1,125 +1,85 @@
-# PNP Control Center v2.0 🎯
-
-**Professional Pick & Place Machine Control Interface**
+# PNP Control Center v2.0
+> **Pick & Place Control Interface for Raspberry Pi**
 
 ![Status](https://img.shields.io/badge/Status-Active-success)
-![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
-![Flask](https://img.shields.io/badge/Backend-Flask-green)
-![GRBL](https://img.shields.io/badge/CNC-GRBL-orange)
+![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi-red)
+![Python](https://img.shields.io/badge/Python-3.9+-blue)
 
-Development of a comprehensive control interface for a Pick and Place (PNP) machine, integrating real-time camera streaming, OCR-based component detection, and precise motor control via GRBL.
+PNP Control Center is a comprehensive web-based interface for controlling Pick & Place machines powered by GRBL controllers and Raspberry Pi. It features real-time camera streaming with OCR capabilities, precise motor control, and an intuitive modern UI.
 
-## 🚀 Features
+## 🌟 Key Features
 
-- **Real-time Monitoring**: High-quality MJPEG stream from the machine's camera.
-- **OCR Component Detection**: Utilizing `tesserocr` to identify components (e.g., chips, labels) on the PCB.
-- **Auto-Centering**: 
-  - Automatically center the camera on a specific target word.
-  - Supports dynamic target word input.
-  - Two-stage centering (Coarse & Fine) for high precision.
-- **Manual Control**:
-  - Full X/Y/Z axis control via UI buttons or keyboard shortcuts.
-  - Pump (Vacuum) toggle.
-  - Emergency Stop & Soft Reset.
-- **Configuration & Calibration**:
-  - Easy-to-use calibration wizard for camera-motor alignment.
-  - Customize resolution, feed rates, and target words directly from the UI.
-- **Professional UI**:
-  - Modern, dark-themed interface built with responsive CSS.
-  - Central pop-up notifications for improved user feedback.
+### 🎮 Machine Control
+- **Full Axis Control:** Precise X, Y, Z movement with adjustable step sizes (0.1mm - 50mm)
+- **GRBL Integration:** Direct G-code sending, alarm handling, and real-time status monitoring
+- **Smart Homing:** Auto-home capability on startup or demand
+- **Pump Control:** Integrated vacuum pump switching
+
+### 👁️ Computer Vision & OCR
+- **Live Stream:** High-performance MJPEG streaming with low latency
+- **OCR Engine:** Tesseract-based optical character recognition for component identification
+- **Smart Filtering:** 
+  - Minimum word length filtering
+  - Bounding box stability checks
+  - Ignore list configuration
+- **PIP Zoom:** Picture-in-Picture zoom window with live annotations
+- **Auto-Centering:** Automatically aligns the machine head with recognized text/components using visual feedback
+
+### ⚙️ Configuration & Customization
+- **Web-based Settings:** Configure camera resolution, motor steps, and OCR parameters directly from the UI
+- **Calibration Wizard:** Step-by-step visual calibration for camera-to-motor coordinate mapping
+- **Theme Support:** Dark/Light mode toggle
+- **Position Memory:** Save and recall specific machine coordinates (Bases)
 
 ## 🛠️ Installation
 
 ### Prerequisites
-
-- **Python 3.9+**
-- **Tesseract OCR** (System dependency)
-  ```bash
-  sudo apt-get install tesseract-ocr libtesseract-dev libleptonica-dev
-  ```
+- Raspberry Pi (4 or 5 recommended)
+- Python 3.9+
+- Tesseract OCR (`sudo apt install tesseract-ocr libtesseract-dev`)
+- GRBL-based CNC Controller connected via USB
 
 ### Setup
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/bitirici-ekip/ele495.git
+   cd ele495
+   ```
 
-1.  **Clone the Repository**
-    ```bash
-    git clone https://github.com/bitirici-ekip/ele495.git
-    cd ele495
-    ```
+2. **Create a virtual environment:**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
 
-2.  **Create Virtual Environment**
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
+3. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-3.  **Install Dependencies**
-    ```bash
-    pip install -r requirements.txt
-    ```
+## 🚀 Usage
 
-## ▶️ Usage
+1. **Start the application:**
+   ```bash
+   sudo ./venv/bin/python app.py
+   ```
+   *Note: `sudo` might be required for accessing serial ports and hardware interfaces.*
 
-1.  **Start the Application**
-    ```bash
-    python app.py
-    ```
-    *The server will start on port 5000 by default.*
-
-2.  **Access the Web Interface**
-    Open your browser and navigate to:
-    `http://localhost:5000` (or the Raspberry Pi's IP address)
-
-3.  **Login**
-    - **Username**: `admin`
-    - **Password**: `admin`
-
-## 🎮 Controls
-
-### Keyboard Shortcuts
-
-| Key | Action |
-| :--- | :--- |
-| **Arrow Keys** | Move X/Y Axis |
-| **Page Up/Down** | Move Z Axis |
-| **H** | Home Machine ($H) |
-| **C** | Start Auto-Center |
-| **E** | Emergency Stop |
-
-### OCR & Auto-Center
-
-1.  Go to the **OCR Tab** to view detected words.
-2.  Add new target words if needed.
-3.  In the **Control Tab**, type the target word into the "HEDEF KELİME" input.
-4.  Click **MERKEZLE** to automatically move the machine until the target is centered.
-
-## ⚙️ Configuration
-
-Settings are saved in `config.json`. You can modify these via the **Settings Tab** in the UI:
-- **Pixel-to-MM Ratio**: Calibrate for accurate movement.
-- **Camera Resolution**: Default 800x1080.
-- **Motor Directions**: Invert axes if necessary.
+2. **Access the interface:**
+   Open your browser and navigate to: `http://<raspberry-pi-ip>:5000`
 
 ## 📂 Project Structure
 
-```
-├── app.py              # Main Application Entry Point (Flask + Logic)
-├── config.json         # Persistent Configuration
-├── requirements.txt    # Python Dependencies
-├── static/
-│   ├── app.js          # Frontend Logic (SocketIO, UI interactions)
-│   └── style.css       # Professional Dark Theme Styling
-└── templates/
-    ├── index.html      # Main Dashboard
-    └── login.html      # Login Page
-```
+- `app.py` - Main Flask application and backend logic
+- `static/` - Frontend assets (CSS, JS)
+- `templates/` - HTML templates
+- `config.json` - Machine and application configuration
+- `bases.json` - Saved coordinate database
 
-## 🤝 Contribution
+## 🤝 Contributing
 
-1.  Fork the repository.
-2.  Create your feature branch (`git checkout -b feature/AmazingFeature`).
-3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-4.  Push to the branch (`git push origin feature/AmazingFeature`).
-5.  Open a Pull Request.
+Contributions are welcome! Please feel free to submit a Pull Request.
 
----
-*Developed by Bitirici Ekip for ELE495.*
+## 📄 License
+
+This project is proprietary software developed by **Bitirici Ekip**. All rights reserved.

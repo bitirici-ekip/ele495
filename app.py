@@ -39,6 +39,14 @@ import numpy as np
 from PIL import Image
 import difflib
 
+# tesserocr — ana thread'de import edilmeli (signal handler kısıtı)
+try:
+    import tesserocr
+    TESSEROCR_AVAILABLE = True
+except ImportError:
+    TESSEROCR_AVAILABLE = False
+    logging.getLogger("PNP").warning("tesserocr bulunamadı — OCR devre dışı.")
+
 # Flask ve SocketIO
 from flask import (Flask, render_template, Response, jsonify, request,
                    session, redirect, url_for)
@@ -67,27 +75,29 @@ class Config:
     kameranın PCB'ye uzaklığına göre ayarlanmalıdır.
     """
     # Kamera çözünürlüğü (OCR için Yüksek Çözünürlük)
-    CAMERA_WIDTH = 800
+    CAMERA_WIDTH = 1920
     CAMERA_HEIGHT = 1080
 
     # Yayın (Stream) için maksimum genişlik (Optimizasyon)
     STREAM_MAX_WIDTH = 800
 
     # Piksel → Milimetre dönüşüm katsayıları (kalibrasyon ile ayarlanır)
-    PIXEL_TO_MM_X = 0.1
-    PIXEL_TO_MM_Y = 0.1
+    PIXEL_TO_MM_X = 0.02
+    PIXEL_TO_MM_Y = 0.02
 
     # Hedef nokta (ekran koordinatlarında, piksel cinsinden)
-    TARGET_X = CAMERA_HEIGHT // 2
-    TARGET_Y = CAMERA_WIDTH // 2
+    TARGET_X = CAMERA_WIDTH // 2
+    TARGET_Y = CAMERA_HEIGHT // 2
 
     # OCR parametreleri
-    OCR_CONFIDENCE_THRESHOLD = 50
+    OCR_CONFIDENCE_THRESHOLD = 40
     STABILITY_DURATION = 0.1
     IOU_MATCH_THRESHOLD = 0.4
+    OCR_PSM_MODE = 6          # 6=SINGLE_BLOCK, 11=SPARSE_TEXT, 3=AUTO
+    OCR_WHITELIST = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
     # Motor hareket ayarları
-    MOVE_STEP = 1.0
+    MOVE_STEP = 5.0
     FEED_RATE = 1000
     AUTO_CENTER_MAX_ITER = 10
     AUTO_CENTER_TOLERANCE = 5
@@ -108,8 +118,22 @@ class Config:
     FINE_TUNE_STEP_MM = 0.05     # İkinci aşama hassas adım
     FINE_TUNE_ENABLED = True
 
+
     # Seçilen hedef kelime (Eğer boş değilse, auto-center sadece bunu arar)
     SELECTED_TARGET_WORD = ""
+
+    # PIP Zoom Faktörü
+    ZOOM_FACTOR = 2.0
+
+    # OCR Minimum Kelime Uzunluğu (Bu değerden kısa kelimeler atlanır)
+    OCR_MIN_WORD_LENGTH = 3
+
+    # Kutu Büyüme Limiti (Ani sapıtma koruması — bu kattan fazla büyüyen kutular reddedilir)
+    BOX_GROWTH_LIMIT = 3.0
+
+    # Açılışta Otomatik Home
+    AUTO_HOME = True
+
 
     # Motor hareket yönü ters çevirme (eski, geriye uyumluluk)
     INVERT_X = True
@@ -117,12 +141,15 @@ class Config:
 
     # ── KALİBRASYON: Eksen Eşleme ─────────────────
     # Kamera montaj açısına göre ekran↔motor ekseni dönüşümü
-    SWAP_AXES = True            # Ekran X↔Y yer değiştir (90° dönük kamera)
-    NEGATE_SCREEN_X = False     # Ekran X yönünü ters çevir
-    NEGATE_SCREEN_Y = True      # Ekran Y yönünü ters çevir
+    # 180 Derece dönüşte genelde eksenler swap olmaz, sadece yönleri ters olabilir.
+    SWAP_AXES = False            # 180 derece için False yapıldı
+    NEGATE_SCREEN_X = True       # 180 derece için (Deneme yanılma gerekir)
+    NEGATE_SCREEN_Y = True       # 180 derece için
 
     # Konfigürasyon dosya yolu
     CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
+    BASES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bases.json')
+    BASES = []
 
     def to_dict(self):
         """JSON olarak döndür."""
@@ -152,6 +179,13 @@ class Config:
             "fine_tune_enabled": self.FINE_TUNE_ENABLED,
             "stream_max_width": self.STREAM_MAX_WIDTH,
             "selected_target_word": self.SELECTED_TARGET_WORD,
+            "ocr_confidence": self.OCR_CONFIDENCE_THRESHOLD,
+            "ocr_psm_mode": self.OCR_PSM_MODE,
+            "ocr_whitelist": self.OCR_WHITELIST,
+            "zoom_factor": self.ZOOM_FACTOR,
+            "ocr_min_word_length": self.OCR_MIN_WORD_LENGTH,
+            "box_growth_limit": self.BOX_GROWTH_LIMIT,
+            "auto_home": self.AUTO_HOME,
         }
 
     def update_from_dict(self, data):
@@ -178,6 +212,13 @@ class Config:
         if "fine_tune_enabled" in data: self.FINE_TUNE_enabled = bool(data["fine_tune_enabled"])
         if "stream_max_width" in data: self.STREAM_MAX_WIDTH = int(data["stream_max_width"])
         if "selected_target_word" in data: self.SELECTED_TARGET_WORD = str(data["selected_target_word"])
+        if "ocr_confidence" in data: self.OCR_CONFIDENCE_THRESHOLD = int(data["ocr_confidence"])
+        if "ocr_psm_mode" in data: self.OCR_PSM_MODE = int(data["ocr_psm_mode"])
+        if "ocr_whitelist" in data: self.OCR_WHITELIST = str(data["ocr_whitelist"])
+        if "zoom_factor" in data: self.ZOOM_FACTOR = float(data["zoom_factor"])
+        if "ocr_min_word_length" in data: self.OCR_MIN_WORD_LENGTH = int(data["ocr_min_word_length"])
+        if "box_growth_limit" in data: self.BOX_GROWTH_LIMIT = float(data["box_growth_limit"])
+        if "auto_home" in data: self.AUTO_HOME = bool(data["auto_home"])
         
         # Target words'ü seçili gruba göre güncelle
         if self.TARGET_GROUP in self.OCR_GROUPS:
@@ -204,10 +245,52 @@ class Config:
         except Exception as e:
             log.error(f"Config yükleme hatası: {e}")
 
+    def load_bases(self):
+        """Bases dosyasını yükle (Robust)."""
+        log.info(f"Bases yükleniyor: {self.BASES_FILE}")
+        try:
+            if os.path.exists(self.BASES_FILE):
+                with open(self.BASES_FILE, 'r') as f:
+                    content = f.read().strip()
+                
+                if content:
+                    try:
+                        self.BASES = json.loads(content)
+                        log.info(f"{len(self.BASES)} adet konum yüklendi.")
+                    except json.JSONDecodeError:
+                        log.error("Bases JSON hatası! Yedekleniyor...")
+                        try:
+                            import shutil
+                            shutil.copy(self.BASES_FILE, self.BASES_FILE + ".bak")
+                        except: pass
+                        self.BASES = []
+                else:
+                    self.BASES = []
+                    log.warning("Bases dosyası boş.")
+            else:
+                self.BASES = []
+                log.info("Bases dosyası bulunamadı, yeni oluşturulacak.")
+        except Exception as e:
+            log.error(f"Bases yükleme hatası: {e}")
+            self.BASES = []
+
+    def save_bases(self):
+        """Bases dosyasını güvenli kaydet (Atomic Write)."""
+        try:
+            temp_file = self.BASES_FILE + ".tmp"
+            with open(temp_file, 'w') as f:
+                json.dump(self.BASES, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_file, self.BASES_FILE)
+            log.info(f"Bases kaydedildi: {len(self.BASES)} adet")
+        except Exception as e:
+            log.error(f"Bases kayıt hatası: {e}")
 
 # Global config nesnesi
 config = Config()
 config.load_config()
+config.load_bases()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -403,14 +486,28 @@ class PNPDriver:
         log.info(f"Motor hareketi: dx={dx:.3f}mm, dy={dy:.3f}mm, dz={dz:.3f}mm")
         self.send(cmd)
         self.send("G4 P0")   # Senkronizasyon — hareketin tamamlanmasını bekle
-        self.send("G90")     # Tekrar mutlak moda dön
-
-        # Simüle pozisyon güncelleme
+        # Hareket tamamlandıktan sonra tekrar mutlak moda dön
+        self.send("G90")
+        
+        # Konum güncelleme (tahmini)
         self.current_x += dx
         self.current_y += dy
         self.current_z += dz
-
         return True
+
+    def move_absolute_z(self, z_mm, feed=None):
+        """
+        Mutlak Z hareketi (G90).
+        Belirtilen Z koordinatına gider.
+        """
+        feed = feed or config.FEED_RATE
+        self.send("G90")  # Mutlak mod
+        cmd = f"G1 Z{z_mm:.3f} F{feed}"
+        log.info(f"Z hareketi (mutlak): {cmd}")
+        success = self.send(cmd)
+        if success:
+            self.current_z = z_mm
+        return success
 
     def move_absolute(self, x=None, y=None, z=None, feed=None):
         """Mutlak koordinata hareket."""
@@ -646,14 +743,15 @@ class CameraManager:
         try:
             frame_rgb = self.picam2.capture_array()
 
-            # RGB → Grayscale ve 90° saat yönünde döndür
+            # RGB → Grayscale ve 180° döndür (Baş Aşağı)
             gray = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2GRAY)
-            gray_rotated = cv2.rotate(gray, cv2.ROTATE_90_CLOCKWISE)
+            gray_rotated = cv2.rotate(gray, cv2.ROTATE_180)
 
             # OCR için threshold
-            blurred = cv2.GaussianBlur(gray_rotated, (3, 3), 0)
-            _, thresh = cv2.threshold(
-                blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+            blurred = cv2.GaussianBlur(gray_rotated, (5, 5), 0)
+            thresh = cv2.adaptiveThreshold(
+                blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY, 31, 10
             )
             kernel = np.ones((2, 2), np.uint8)
             thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
@@ -700,9 +798,17 @@ class CameraManager:
                     best_id = bid
 
             if best_id is not None:
-                self.stable_boxes[best_id]['rect'] = det['rect']
-                self.stable_boxes[best_id]['text'] = det['text']
-                self.stable_boxes[best_id]['last_seen'] = now
+                # Aniden 3x'ten fazla büyüyen kutuları reddet (sapıtma koruması)
+                old_rect = self.stable_boxes[best_id]['rect']
+                old_area = old_rect[2] * old_rect[3]
+                new_area = det['rect'][2] * det['rect'][3]
+                if old_area > 0 and new_area > old_area * config.BOX_GROWTH_LIMIT:
+                    # Anormal büyüme — sadece last_seen güncelle, rect değiştirme
+                    self.stable_boxes[best_id]['last_seen'] = now
+                else:
+                    self.stable_boxes[best_id]['rect'] = det['rect']
+                    self.stable_boxes[best_id]['text'] = det['text']
+                    self.stable_boxes[best_id]['last_seen'] = now
             else:
                 self.box_id_counter += 1
                 self.stable_boxes[self.box_id_counter] = {
@@ -724,30 +830,53 @@ class CameraManager:
         OCR arka plan thread'i.
         Threshold görüntüsü üzerinde tesserocr ile yazı algılama yapar.
         """
-        try:
-            import tesserocr
-        except ImportError:
+        if not TESSEROCR_AVAILABLE:
             log.warning("tesserocr bulunamadı — OCR devre dışı.")
             return
-        except Exception as e:
-            log.error(f"tesserocr yüklenirken hata: {e}")
-            return
 
-        try:
-            api = tesserocr.PyTessBaseAPI(
+        # PSM ve whitelist'i config'den oku — değiştikçe API yeniden oluşturulur
+        current_psm = config.OCR_PSM_MODE
+        current_whitelist = config.OCR_WHITELIST
+
+        def create_api(psm_mode, whitelist):
+            """Tesseract API oluştur."""
+            psm_map = {
+                3: tesserocr.PSM.AUTO,
+                6: tesserocr.PSM.SINGLE_BLOCK,
+                11: tesserocr.PSM.SPARSE_TEXT,
+            }
+            psm = psm_map.get(psm_mode, tesserocr.PSM.SINGLE_BLOCK)
+            _api = tesserocr.PyTessBaseAPI(
                 path='/usr/share/tesseract-ocr/5/tessdata/',
                 lang='eng',
-                psm=tesserocr.PSM.SPARSE_TEXT,
+                psm=psm,
                 oem=tesserocr.OEM.LSTM_ONLY
             )
-            api.SetVariable("tessedit_do_invert", "0")
+            _api.SetVariable("tessedit_do_invert", "0")
+            if whitelist:
+                _api.SetVariable("tessedit_char_whitelist", whitelist)
+            return _api
+
+        try:
+            api = create_api(current_psm, current_whitelist)
         except Exception as e:
             log.error(f"Tesseract başlatılamadı: {e}")
             return
 
-        log.info("OCR worker başlatıldı.")
+        log.info(f"OCR worker başlatıldı (PSM={current_psm}, Whitelist='{current_whitelist}').")
 
         while self.active:
+            # Config değişikliği kontrolü — PSM veya whitelist değiştiyse API'yi yeniden oluştur
+            if config.OCR_PSM_MODE != current_psm or config.OCR_WHITELIST != current_whitelist:
+                current_psm = config.OCR_PSM_MODE
+                current_whitelist = config.OCR_WHITELIST
+                try:
+                    api.End()
+                    api = create_api(current_psm, current_whitelist)
+                    log.info(f"OCR API yeniden oluşturuldu (PSM={current_psm}, Whitelist='{current_whitelist}')")
+                except Exception as e:
+                    log.error(f"OCR API yeniden oluşturma hatası: {e}")
+
             if self.current_thresh is not None:
                 t_start = time.time()
 
@@ -775,12 +904,20 @@ class CameraManager:
                             continue
                         if w_box <= 0 or h_box <= 0:
                             continue
+                        # Minimum boyut filtresi (çok küçük gürültü)
+                        if w_box < 5 or h_box < 5:
+                            continue
+                        # Maksimum boyut filtresi (frame alanının %25'inden büyükse sapıtma)
+                        box_area = w_box * h_box
+                        frame_area = img_w * img_h
+                        if box_area > frame_area * 0.25:
+                            continue
 
                         api.SetRectangle(x, y, w_box, h_box)
                         text = api.GetUTF8Text().strip()
                         conf = api.MeanTextConf()
 
-                        if conf > config.OCR_CONFIDENCE_THRESHOLD and text:
+                        if conf > config.OCR_CONFIDENCE_THRESHOLD and text and len(text) >= config.OCR_MIN_WORD_LENGTH:
                             # ── Fuzzy Matching (Bulanık Eşleşme) ──
                             # Algılanan metni, tanımlı gruplardaki kelimelerle karşılaştır
                             # Eğer benzerlik %80 üzerindeyse, doğrusuyla değiştir
@@ -897,26 +1034,53 @@ class CameraManager:
                 # ── Merkez noktası (kırmızı daire)
                 cv2.circle(display, (cx, cy), 5, (0, 0, 255), -1)
 
-                # ── Yazı etiketi (KIRMIZI ve BÜYÜK font)
-                label = f"{otext} ({ocx},{ocy})"
+                # ── Yazı etiketi (sadece okunan yazı, boyut stream kalitesine göre sabit oran)
+                font_scale = max(0.4, img_w / 800.0 * 0.6)
+                thickness = max(1, int(img_w / 800.0 * 2))
+                label = otext
                 # Arkaplan kutusu (okunabilirlik için)
-                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
                 cv2.rectangle(display, (x, y - th - 6), (x + tw, y), (255, 255, 255), -1)
                 
                 cv2.putText(display, label, (x, y - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), thickness)
 
-            # ─── Hedef nokta crosshair (ekranın ortası — mavi) ──────────
-            # Hedef nokta da ölçeklenmeli
-            tx = int(config.TARGET_X * scale)
-            ty = int(config.TARGET_Y * scale)
+            # ─── Hedef nokta crosshair (Grid / Profesyonel Görünüm) ──────────
+            # Her zaman frame boyutundan dinamik hesapla
+            tx = img_w // 2
+            ty = img_h // 2
             
-            # Yatay çizgi
-            cv2.line(display, (tx - 20, ty), (tx + 20, ty), (255, 100, 0), 1)
-            # Dikey çizgi
-            cv2.line(display, (tx, ty - 20), (tx, ty + 20), (255, 100, 0), 1)
-            # Dış daire
-            cv2.circle(display, (tx, ty), 15, (255, 100, 0), 1)
+            # Renkler: Cyan (Turkuaz)
+            color_main = (255, 255, 0)  # BGR
+            color_sub = (100, 100, 0)   # Daha sönük
+            gap = 25 # Merkez boşluğu
+            
+            # 1. Tam Ekran Kılavuz Çizgileri (Boşluklu)
+            # Yatay Sol
+            cv2.line(display, (0, ty), (tx - gap, ty), color_main, 1)
+            # Yatay Sağ
+            cv2.line(display, (tx + gap, ty), (img_w, ty), color_main, 1)
+            # Dikey Üst
+            cv2.line(display, (tx, 0), (tx, ty - gap), color_main, 1)
+            # Dikey Alt
+            cv2.line(display, (tx, ty + gap), (tx, img_h), color_main, 1)
+
+            # 2. Eşmerkezli Daireler (Nişangah)
+            for rad in [50, 100, 150, 200]:
+                cv2.circle(display, (tx, ty), rad, color_sub, 1)
+
+            # 3. Cetvel Çentikleri (Ticks) - Her 50px
+            # Yatay Eksen Çentikleri
+            for i in range(0, img_w, 50):
+                if abs(i - tx) < gap: continue
+                cv2.line(display, (i, ty - 5), (i, ty + 5), color_sub, 1)
+            # Dikey Eksen Çentikleri
+            for i in range(0, img_h, 50):
+                if abs(i - ty) < gap: continue
+                cv2.line(display, (tx - 5, i), (tx + 5, i), color_sub, 1)
+            
+            # 4. Merkez Nokta (Küçük kırmızı nokta, en ortada)
+            cv2.circle(display, (tx, ty), 2, (0, 0, 255), -1)
 
             # ─── FPS bilgisi (Artık Client-side overlay'e taşındı, buraya yazmıyoruz) ────
             frame_count += 1
@@ -928,8 +1092,64 @@ class CameraManager:
 
             # Auto-center durumu
             if self.auto_centering:
-                cv2.putText(display, "AUTO-CENTER AKTIF", (5, img_h - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                text = "OTOMATIK-MERKEZLEME AKTIF"
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                scale = 1.0
+                thick = 3
+                (tw, th), _ = cv2.getTextSize(text, font, scale, thick)
+                tx_start = (img_w - tw) // 2
+                ty_start = 50
+                cv2.rectangle(display, (tx_start - 10, ty_start - th - 10), (tx_start + tw + 10, ty_start + 10), (0,0,0), -1)
+                cv2.putText(display, text, (tx_start, ty_start), font, scale, (0, 0, 255), thick) # Kırmızı
+
+            # ─── PIP ZOOM (Sol Alt Köşe) ──────────
+            if config.ZOOM_FACTOR > 1.0:
+                try:
+                    # Annotasyonlu frame'den (display) merkezden crop al
+                    # Böylece OCR kutuları ve merkez noktaları PIP'te de görünür
+                    fh, fw = display.shape[:2]
+                    z_w = int(fw / config.ZOOM_FACTOR)
+                    z_h = int(fh / config.ZOOM_FACTOR)
+                    cx_f, cy_f = fw // 2, fh // 2
+                    
+                    x1 = max(0, cx_f - z_w // 2)
+                    y1 = max(0, cy_f - z_h // 2)
+                    x2 = min(fw, x1 + z_w)
+                    y2 = min(fh, y1 + z_h)
+                    
+                    crop = display[y1:y2, x1:x2]
+                    
+                    # PIP Boyutu (Sabit - Daha Küçük)
+                    pip_h_target = 150
+                    pip_w_target = int(pip_h_target * (fw / fh))
+                    
+                    pip_resized = cv2.resize(crop, (pip_w_target, pip_h_target), interpolation=cv2.INTER_LINEAR)
+                    
+                    # Çerçeve çiz
+                    cv2.rectangle(pip_resized, (0,0), (pip_w_target-1, pip_h_target-1), (255,165,0), 4) # Turuncu çerçeve
+                    
+                    # Merkez işareti (PIP içi - DAHA BELİRGİN)
+                    pcx, pcy = pip_w_target//2, pip_h_target//2
+                    # Siyah dış hat (kontrast için)
+                    cv2.line(pip_resized, (pcx-15, pcy), (pcx+15, pcy), (0,0,0), 4)
+                    cv2.line(pip_resized, (pcx, pcy-15), (pcx, pcy+15), (0,0,0), 4)
+                    # Yeşil iç hat
+                    cv2.line(pip_resized, (pcx-15, pcy), (pcx+15, pcy), (0,255,0), 2)
+                    cv2.line(pip_resized, (pcx, pcy-15), (pcx, pcy+15), (0,255,0), 2)
+                    
+                    # PIP Overlay Konumu: Sol Alt
+                    pos_y = img_h - pip_h_target - 10
+                    pos_x = 10
+                    
+                    # Overlay işlemi
+                    display[pos_y:pos_y+pip_h_target, pos_x:pos_x+pip_w_target] = pip_resized
+                    
+                    # Label
+                    cv2.putText(display, f"ZOOM x{config.ZOOM_FACTOR:.1f}", (pos_x + 5, pos_y + 20),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                                
+                except Exception as e:
+                    pass # PIP hatası akışı bozmasın
 
             # Annotasyonlu frame'i kaydet (stream için)
             with self.frame_lock:
@@ -952,33 +1172,46 @@ class CameraManager:
     def find_target_text(self):
         """
         Hedef yazıları OCR sonuçlarından bul.
-        Eğer config.SELECTED_TARGET_WORD ayarlıysa, SADECE onu arar.
-        Değilse, config.TARGET_WORDS listesindeki herhangi birini arar.
+        Birden fazla eşleşme varsa ekran merkezine en yakın olanı döndürür.
         """
         target_exact = config.SELECTED_TARGET_WORD.strip()
-        
+        # Ekran merkezi (180 derece olduğu için en/boy değişmez)
+        center_x = config.CAMERA_WIDTH // 2
+        center_y = config.CAMERA_HEIGHT // 2
+
+        candidates = []
+
         with self.ocr_lock:
             for item in self.ocr_results:
                 txt = item['text']
                 txt_lower = txt.lower()
-                
-                # 1. Öncelik: Seçili kelime (Tam veya kapsayan eşleşme)
-                if target_exact:
-                    # Fuzzy match zaten ocr_worker'da yapıldı, burada direkt kontrol edebiliriz
-                    # Ancak kullanıcı "R1" seçtiyse ve OCR "R1" döndürdüyse eşleşmeli
-                    if target_exact == txt or target_exact in txt:
-                        return item
-                    continue # Seçili kelime varsa diğerlerine bakma
+                matched = False
 
-                # 2. Öncelik: Liste tarama (Genel mod)
-                for word in config.TARGET_WORDS:
-                    if word.lower() in txt_lower:
-                        return item
-                
-                # Geriye dönük uyumluluk
-                if config.TARGET_TEXT.lower() in txt_lower:
-                    return item
-        return None
+                # 1. Öncelik: Seçili kelime
+                if target_exact:
+                    if target_exact == txt or target_exact in txt:
+                        matched = True
+                else:
+                    # 2. Öncelik: Liste tarama
+                    for word in config.TARGET_WORDS:
+                        if word.lower() in txt_lower:
+                            matched = True
+                            break
+                    # Geriye dönük uyumluluk
+                    if not matched and config.TARGET_TEXT.lower() in txt_lower:
+                        matched = True
+
+                if matched:
+                    cx, cy = item['center']
+                    dist = ((cx - center_x) ** 2 + (cy - center_y) ** 2) ** 0.5
+                    candidates.append((dist, item))
+
+        if not candidates:
+            return None
+
+        # Merkeze en yakın olanı seç
+        candidates.sort(key=lambda x: x[0])
+        return candidates[0][1]
 
     def stop(self):
         """Kamerayı ve thread'leri durdur."""
@@ -998,125 +1231,190 @@ class CameraManager:
 def auto_center(camera: CameraManager, pnp: PNPDriver, socketio: SocketIO, target_word=None):
     """
     Tespit edilen hedef yazıyı ekranın merkezine taşır.
-    İki aşamalı hassas merkezleme yapılır:
-      1. Kaba Merkezleme (Normal hız/adım)
-      2. Hassas Merkezleme (Düşük hız/küçük adım)
+    Profesyonel 4 aşamalı süreç:
+      0. Başlangıç — Hedef arama (ekranda yoksa etrafı tarar)
+      1. Kaba Merkezleme — Büyük adımlarla hızlı yaklaşma
+      2. Hassas Merkezleme — Küçük adımlarla son düzeltme
+      3. Son Kontrol — Doğrulama
     """
     camera.auto_centering = True
     camera.auto_center_status = "Başlatılıyor..."
-    socketio.emit('auto_center_update', {'status': 'started', 'message': 'Auto-center başlatıldı'})
+    what_to_search = target_word if target_word else (config.SELECTED_TARGET_WORD if config.SELECTED_TARGET_WORD else config.TARGET_GROUP)
+
+    def emit(status, message, phase=None):
+        """Log + SocketIO ile kullanıcıya bildir."""
+        prefix = f"[{phase}] " if phase else ""
+        full_msg = prefix + message
+        camera.auto_center_status = full_msg
+        socketio.emit('auto_center_update', {'status': status, 'message': full_msg})
+        log.info(f"Auto-Center: {full_msg}")
 
     try:
-        # ─── 1. AŞAMA: KABA MERKEZLEME ───
-        log.info("--- AŞAMA 1: KABA MERKEZLEME ---")
-        
-        # Başlangıç parametreleri
-        coarse_tolerance = config.AUTO_CENTER_TOLERANCE
-        
-        success_first_pass = False
-        
-        for iteration in range(config.AUTO_CENTER_MAX_ITER):
-            time.sleep(0.5) # Stabilizasyon
+        # ─── TARAMA DESENLERİ ───
+        scan_step = 0.5  # mm
+        scan_pattern_small = [
+            (scan_step, 0), (0, scan_step), (-scan_step, 0), (-scan_step, 0),
+            (0, -scan_step), (0, -scan_step), (scan_step, 0), (scan_step, 0)
+        ]
+        scan_step_wide = 1.0
+        scan_pattern_wide = [
+            (scan_step_wide, 0), (0, scan_step_wide),
+            (-scan_step_wide, 0), (-scan_step_wide, 0),
+            (0, -scan_step_wide), (0, -scan_step_wide),
+            (scan_step_wide, 0), (scan_step_wide, 0),
+            (scan_step_wide, 0), (0, scan_step_wide), (0, scan_step_wide),
+            (-scan_step_wide, 0), (-scan_step_wide, 0), (-scan_step_wide, 0),
+            (0, -scan_step_wide), (0, -scan_step_wide),
+        ]
 
-            target = camera.find_target_text()
+        def search_target(max_wait=3, scan_pattern=None):
+            """Hedef yazıyı ara: önce bekle, bulamazsa tarama yap."""
+            for wait_try in range(max_wait):
+                time.sleep(0.8)
+                t = camera.find_target_text()
+                if t is not None:
+                    return t
+                emit('moving', f"OCR taranıyor... ({wait_try+1}/{max_wait})")
+
+            if scan_pattern is None:
+                return None
+
+            emit('moving', f"Hedef görünmüyor — etraf taranıyor ({len(scan_pattern)} adım)...")
+            for si, (sdx, sdy) in enumerate(scan_pattern):
+                motor_dx, motor_dy = screen_to_motor(sdx, sdy)
+                pnp.move_relative(dx=motor_dx, dy=motor_dy)
+                time.sleep(0.8)
+                t = camera.find_target_text()
+                if t is not None:
+                    emit('moving', f"Hedef bulundu! (tarama adım {si+1}/{len(scan_pattern)})")
+                    return t
+                if (si + 1) % 4 == 0:
+                    emit('moving', f"Tarama devam ediyor... ({si+1}/{len(scan_pattern)})")
+            return None
+
+        # Merkez koordinatları (180 derece olduğu için en/boy değişmez)
+        tx = config.CAMERA_WIDTH // 2
+        ty = config.CAMERA_HEIGHT // 2
+
+        # ══════════════════════════════════════════
+        #  AŞAMA 0: BAŞLANGIÇ — HEDEF ARAMA
+        # ══════════════════════════════════════════
+        emit('started', f"'{what_to_search}' aranıyor...", phase="AŞAMA 0")
+        time.sleep(0.5)
+        target = camera.find_target_text()
+
+        if target is None:
+            emit('moving', f"'{what_to_search}' ekranda yok — geniş tarama başlatılıyor...", phase="AŞAMA 0")
+            target = search_target(max_wait=2, scan_pattern=scan_pattern_wide)
             if target is None:
-                what_to_search = target_word if target_word else (config.SELECTED_TARGET_WORD if config.SELECTED_TARGET_WORD else config.TARGET_GROUP)
-                msg = f"Hedef bulunamadı! ({what_to_search})"
-                camera.auto_center_status = msg
-                socketio.emit('auto_center_update', {'status': 'error', 'message': msg})
-                log.warning(msg)
+                emit('error', f"'{what_to_search}' hiçbir yerde bulunamadı!", phase="AŞAMA 0")
                 return
 
+        cx, cy = target['center']
+        emit('moving', f"Hedef bulundu! Konum: ({cx},{cy}) — Merkezleme başlıyor.", phase="AŞAMA 0")
+        time.sleep(0.5)
+
+        # ══════════════════════════════════════════
+        #  AŞAMA 1: KABA MERKEZLEME
+        # ══════════════════════════════════════════
+        emit('moving', "Kaba merkezleme başlıyor...", phase="AŞAMA 1")
+        coarse_tolerance = config.AUTO_CENTER_TOLERANCE
+        success_first_pass = False
+
+        for iteration in range(config.AUTO_CENTER_MAX_ITER):
+            time.sleep(0.5)
+            target = camera.find_target_text()
+            if target is None:
+                emit('moving', f"Hedef kayıp — yeniden aranıyor (iterasyon {iteration+1})...", phase="AŞAMA 1")
+                target = search_target(max_wait=3, scan_pattern=scan_pattern_small if iteration < 3 else None)
+                if target is None:
+                    emit('error', f"Hedef kayboldu ve bulunamadı! ({what_to_search})", phase="AŞAMA 1")
+                    return
+
             cx, cy = target['center']
-            tx, ty = config.TARGET_X, config.TARGET_Y
             dx_px = cx - tx
             dy_px = cy - ty
+            dist_px = (dx_px**2 + dy_px**2) ** 0.5
 
-            # Yeterince yakın mı?
+            emit('moving', f"İterasyon {iteration+1}: Fark = {dist_px:.0f}px (dx={dx_px}, dy={dy_px})", phase="AŞAMA 1")
+
             if abs(dx_px) <= coarse_tolerance and abs(dy_px) <= coarse_tolerance:
-                msg = f"Kaba merkezleme tamamlandı. ({cx},{cy})"
-                camera.auto_center_status = msg
-                socketio.emit('auto_center_update', {'status': 'moving', 'message': msg})
-                log.info(msg)
+                emit('moving', f"Kaba merkezleme tamamlandı ✓ (fark: {dist_px:.0f}px)", phase="AŞAMA 1")
                 success_first_pass = True
                 break
 
-            # Hareket (Kaba)
             screen_dx_mm = dx_px * config.PIXEL_TO_MM_X
             screen_dy_mm = dy_px * config.PIXEL_TO_MM_Y
             motor_dx, motor_dy = screen_to_motor(screen_dx_mm, screen_dy_mm)
-
             pnp.move_relative(dx=motor_dx, dy=motor_dy)
-            time.sleep(0.8)
+            emit('moving', "Stabilizasyon bekleniyor (1.5s)...", phase="AŞAMA 1")
+            time.sleep(1.5)
 
         if not success_first_pass:
-            msg = "Kaba merkezleme başarısız (iterasyon aşıldı)."
-            camera.auto_center_status = msg
-            socketio.emit('auto_center_update', {'status': 'error', 'message': msg})
+            emit('error', "Kaba merkezleme başarısız — maksimum iterasyon aşıldı.", phase="AŞAMA 1")
             return
 
-        # ─── 2. AŞAMA: HASSAS MERKEZLEME (Opsiyonel) ───
+        # ══════════════════════════════════════════
+        #  GEÇİŞ BEKLEMESİ
+        # ══════════════════════════════════════════
+        emit('moving', "Hassas merkezlemeye geçiş — stabilizasyon (2s)...", phase="GEÇİŞ")
+        time.sleep(2.0)
+
+        # ══════════════════════════════════════════
+        #  AŞAMA 2: HASSAS MERKEZLEME
+        # ══════════════════════════════════════════
         if config.FINE_TUNE_ENABLED:
-            time.sleep(1.0) # Ekstra stabilizasyon
-            log.info("--- AŞAMA 2: HASSAS MERKEZLEME ---")
-            
-            fine_tolerance = max(1, coarse_tolerance // 2) # Daha sıkı tolerans
-            
-            # Tek bir hassas düzeltme hamlesi yapıyoruz veya tekrar döngüye sokuyoruz
-            # Burada 3 iterasyonluk hassas döngü kuralım
-            for i in range(3):
+            emit('moving', "Hassas merkezleme başlıyor...", phase="AŞAMA 2")
+            fine_tolerance = max(1, coarse_tolerance // 2)
+
+            for i in range(5):
                 time.sleep(0.5)
                 target = camera.find_target_text()
-                if not target: break
-                
+                if not target:
+                    emit('moving', "Hassas aşamada hedef kayıp — bekleniyor...", phase="AŞAMA 2")
+                    target = search_target(max_wait=2, scan_pattern=None)
+                    if not target:
+                        emit('moving', "Hedef kaybedildi, mevcut konumla devam.", phase="AŞAMA 2")
+                        break
+
                 cx, cy = target['center']
-                tx, ty = config.TARGET_X, config.TARGET_Y
                 dx_px = cx - tx
                 dy_px = cy - ty
-                
-                # Çok çok yakınsa bitir
+                dist_px = (dx_px**2 + dy_px**2) ** 0.5
+
+                emit('moving', f"Hassas düzeltme {i+1}: Fark = {dist_px:.1f}px", phase="AŞAMA 2")
+
                 if abs(dx_px) <= fine_tolerance and abs(dy_px) <= fine_tolerance:
+                    emit('moving', f"Hassas merkezleme tamamlandı ✓ (fark: {dist_px:.1f}px)", phase="AŞAMA 2")
                     break
-                    
-                # Hassas hareket hesabı
+
                 screen_dx_mm = dx_px * config.PIXEL_TO_MM_X
                 screen_dy_mm = dy_px * config.PIXEL_TO_MM_Y
-                
-                # Hareket miktarını FINE_TUNE_STEP_MM ile sınırla (aşırı salınımı önlemek için)
-                # Ancak burada amaç tam gitmek, sadece son bir dokunuş.
-                # Kullanıcı isteği: "ikinci seferinde düşük step size olsun"
-                # Bu yüzden hesaplanan değer yerine sabit küçük adım atmak yerine,
-                # hesaplanan değeri kullanıp G-code tarafında yavaş gitmek daha doğru olabilir.
-                # Fakat kullanıcının isteği "step size" olduğu için, 
-                # eğer fark büyükse bile maksimum config.FINE_TUNE_STEP_MM kadar git diyelim.
-                
-                # X ekseni için clamp
+
                 if abs(screen_dx_mm) > config.FINE_TUNE_STEP_MM:
                     screen_dx_mm = config.FINE_TUNE_STEP_MM * (1 if screen_dx_mm > 0 else -1)
-                
-                # Y ekseni için clamp
                 if abs(screen_dy_mm) > config.FINE_TUNE_STEP_MM:
                     screen_dy_mm = config.FINE_TUNE_STEP_MM * (1 if screen_dy_mm > 0 else -1)
-                    
+
                 motor_dx, motor_dy = screen_to_motor(screen_dx_mm, screen_dy_mm)
-                
-                # Düşük hızda hareket (Feed rate'i düşürebiliriz ama şimdilik normal kalsın, mesafe kısa)
                 pnp.move_relative(dx=motor_dx, dy=motor_dy)
-                time.sleep(1.0) # Tam durmayı bekle
+                time.sleep(1.0)
 
-        # ─── SON KONTROL ───
-        time.sleep(0.5)
+        # ══════════════════════════════════════════
+        #  AŞAMA 3: SON KONTROL
+        # ══════════════════════════════════════════
+        emit('moving', "Son kontrol yapılıyor...", phase="AŞAMA 3")
+        time.sleep(1.0)
         target = camera.find_target_text()
-        final_pos = target['center'] if target else (0,0)
 
-        msg = f"MERKEZLENDİ! ✓ ({final_pos[0]},{final_pos[1]})"
-        camera.auto_center_status = msg
-        socketio.emit('auto_center_update', {
-            'status': 'done',
-            'message': msg,
-            'center': {'x': final_pos[0], 'y': final_pos[1]}
-        })
-        log.info(msg)
+        if target:
+            cx, cy = target['center']
+            dx_px = cx - tx
+            dy_px = cy - ty
+            dist_px = (dx_px**2 + dy_px**2) ** 0.5
+            emit('done', f"MERKEZLENDİ ✓ — '{what_to_search}' fark: {dist_px:.1f}px", phase="TAMAMLANDI")
+        else:
+            emit('done', "Merkezleme tamamlandı — son doğrulama yapılamadı.", phase="TAMAMLANDI")
 
     except Exception as e:
         msg = f"Auto-center hatası: {e}"
@@ -1126,7 +1424,6 @@ def auto_center(camera: CameraManager, pnp: PNPDriver, socketio: SocketIO, targe
 
     finally:
         camera.auto_centering = False
-
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  FLASK WEB SUNUCUSU
@@ -1170,47 +1467,29 @@ log.addHandler(sio_handler)
 
 # ─── Kimlik doğrulama dekoratörü ─────────────────────────────────────────────
 def login_required(f):
-    """Oturum doğrulama dekoratörü — giriş yapmamış kullanıcıyı login'e yönlendirir."""
+    """Oturum doğrulama DEVRE DIŞI — herkes erişebilir."""
     @functools.wraps(f)
     def decorated(*args, **kwargs):
-        if not session.get('logged_in'):
-            # API istekleri için JSON hata dön
-            if request.path.startswith('/api/') or request.path == '/video_feed':
-                return jsonify({'error': 'Unauthorized', 'message': 'Giriş yapın'}), 401
-            return redirect(url_for('login'))
+        # if not session.get('logged_in'):
+        #     ...
         return f(*args, **kwargs)
     return decorated
 
 
 # ─── Sayfalar ────────────────────────────────────────────────────────────────
 
-@app.route('/login', methods=['GET', 'POST'])
+# @app.route('/login', methods=['GET', 'POST'])
+# def login():
+#     ... (devre dışı)
+#     return redirect(url_for('index'))
+
+@app.route('/login')
 def login():
-    """Giriş sayfası."""
-    if request.method == 'POST':
-        username = request.form.get('username', '')
-        password = request.form.get('password', '')
-
-        if username == USERNAME and password == PASSWORD:
-            session['logged_in'] = True
-            session['username'] = username
-            session['login_time'] = time.strftime('%H:%M:%S')
-            session.permanent = True
-            log.info(f"Kullanıcı giriş yaptı: {username}")
-            return redirect(url_for('index'))
-        else:
-            return render_template('login.html', error='Hatalı kullanıcı adı veya şifre!')
-
-    return render_template('login.html', error=None)
-
+    return redirect(url_for('index'))
 
 @app.route('/logout')
 def logout():
-    """Çıkış yap."""
-    user = session.get('username', 'unknown')
-    session.clear()
-    log.info(f"Kullanıcı çıkış yaptı: {user}")
-    return redirect(url_for('login'))
+    return redirect(url_for('index'))
 
 
 @app.route('/')
@@ -1318,6 +1597,16 @@ def api_move():
     socketio.emit('motor_update', pnp.get_status())
     return jsonify({'success': success, 'motor': pnp.get_status()})
 
+@app.route('/api/move_z_absolute', methods=['POST'])
+@login_required
+def api_move_z_absolute():
+    """Mutlak Z hareketi."""
+    data = request.get_json()
+    z = float(data.get('z', -163))
+    success = pnp.move_absolute_z(z_mm=z)
+    socketio.emit('motor_update', pnp.get_status())
+    return jsonify({'success': success, 'motor': pnp.get_status()})
+
 
 @app.route('/api/home', methods=['POST'])
 @login_required
@@ -1380,6 +1669,68 @@ def api_get_config():
     return jsonify(config.to_dict())
 
 
+@app.route('/api/bases', methods=['GET', 'POST'])
+def api_bases():
+    """Kayıtlı konumları listele veya yeni ekle."""
+    if request.method == 'POST':
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': True, 'bases': config.BASES})
+        name = data.get('name')
+        if not name:
+            return jsonify({'success': False, 'message': 'İsim gerekli'})
+        
+        # Aynı isimde varsa güncelle, yoksa ekle
+        entry = {
+            'name': name,
+            'x': float(data.get('x', 0)),
+            'y': float(data.get('y', 0)),
+            'z': float(data.get('z', 0))
+        }
+        
+        # İsim kontrolü
+        exists = False
+        for i, b in enumerate(config.BASES):
+            if b['name'] == name:
+                config.BASES[i] = entry
+                exists = True
+                break
+        if not exists:
+            config.BASES.append(entry)
+            
+        config.save_bases()
+        return jsonify({'success': True, 'message': 'Konum kaydedildi', 'bases': config.BASES})
+        
+    return jsonify({'success': True, 'bases': config.BASES})
+
+@app.route('/api/bases/<name>', methods=['DELETE'])
+def api_delete_base(name):
+    """Kayıtlı konumu sil."""
+    original_len = len(config.BASES)
+    config.BASES = [b for b in config.BASES if b['name'] != name]
+    if len(config.BASES) < original_len:
+        config.save_bases()
+        return jsonify({'success': True, 'message': 'Konum silindi', 'bases': config.BASES})
+    return jsonify({'success': False, 'message': 'Konum bulunamadı'})
+
+@app.route('/api/goto_base', methods=['POST'])
+def api_goto_base():
+    """Kayıtlı konuma git (Güvenli: Önce Z, Sonra XY)."""
+    data = request.get_json()
+    name = data.get('name')
+    target = next((b for b in config.BASES if b['name'] == name), None)
+    
+    if target:
+        # 1. Z Ekseni Hareketi (Güvenlik Önceliği)
+        pnp.move_absolute(z=target['z'])
+        # 2. X ve Y Ekseni Hareketi
+        success = pnp.move_absolute(x=target['x'], y=target['y'])
+        
+        socketio.emit('motor_update', pnp.get_status())
+        return jsonify({'success': success, 'message': f"'{name}' konumuna varıldı (Z -> XY)."})
+    
+    return jsonify({'success': False, 'message': 'Konum bulunamadı'})
+
 @app.route('/api/config', methods=['POST'])
 @login_required
 def api_set_config():
@@ -1412,8 +1763,8 @@ def api_set_camera_resolution():
     config.CAMERA_HEIGHT = new_h
 
     # Hedef noktayı yeni çözünürlüğün merkezine güncelle
-    config.TARGET_X = new_h // 2
-    config.TARGET_Y = new_w // 2
+    config.TARGET_X = new_w // 2
+    config.TARGET_Y = new_h // 2
 
     config.save_config()
 
@@ -1573,6 +1924,35 @@ def api_emergency_stop():
     return jsonify({'success': True, 'message': 'Acil durdurma uygulandı!'})
 
 
+@app.route('/api/shutdown', methods=['POST'])
+@login_required
+def api_shutdown():
+    """Sunucuyu kapat — Python prosesini sonlandır."""
+    log.warning("🔌 SUNUCU KAPATILIYOR — Kullanıcı isteği ile...")
+    socketio.emit('log_message', {
+        'message': '🔌 Sunucu kapatılıyor...',
+        'level': 'WARNING',
+        'timestamp': time.strftime('%H:%M:%S')
+    })
+
+    def shutdown_server():
+        """Kamerayı ve PNP'yi kapat, ardından process'i sonlandır."""
+        time.sleep(1)  # Client'a yanıt göndermek için kısa bekle
+        try:
+            camera.stop()
+        except Exception:
+            pass
+        try:
+            pnp.close()
+        except Exception:
+            pass
+        log.info("Sistem kapatıldı. Güle güle!")
+        os._exit(0)
+
+    threading.Thread(target=shutdown_server, daemon=True).start()
+    return jsonify({'success': True, 'message': 'Sunucu kapatılıyor...'})
+
+
 @app.route('/api/soft_reset', methods=['POST'])
 @login_required
 def api_soft_reset():
@@ -1707,6 +2087,13 @@ def main():
     # 2. PNP motoruna bağlan
     try:
         pnp.connect()
+        if pnp.connected and config.AUTO_HOME:
+            log.info("Otomatik Home başlatılıyor...")
+            try:
+                pnp.home()
+                log.info("Otomatik Home tamamlandı.")
+            except Exception as he:
+                log.warning(f"Otomatik Home hatası: {he}")
     except Exception as e:
         log.warning(f"PNP bağlantısı kurulamadı: {e} — simülasyon modunda devam")
 

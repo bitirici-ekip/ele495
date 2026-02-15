@@ -27,6 +27,7 @@
             <button class="tab-btn" data-tab="ocr" onclick="switchTab('ocr')">🔍 OCR</button>
             <button class="tab-btn" data-tab="calibration" onclick="switchTab('calibration')">🔧 Kalibrasyon</button>
             <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Ayarlar</button>
+            <button class="tab-btn" data-tab="bases" onclick="switchTab('bases')">📍 Konumlar</button>
         </div>
         <div class="h-right">
             <div class="badge ok" id="motorBadge"><span class="dot"></span><span id="motorBadgeTxt">Motor</span></div>
@@ -64,6 +65,18 @@
                     </div>
                 </div>
 
+                <!-- Quick Location Panel (New) -->
+                <div class="card" style="width:100%; display:flex; flex-direction:column; margin-bottom:10px">
+                    <div class="card-h"><span class="card-t">📍 Hızlı Konum</span></div>
+                    <div class="card-b" style="padding:10px; display:flex; gap:6px">
+                        <select id="quickBaseSel" class="cam-inp" style="flex:1">
+                            <option value="">Seç...</option>
+                        </select>
+                        <button class="btn btn-p ripple" onclick="gotoBase()"
+                            style="padding:0 12px; font-weight:bold">GİT</button>
+                    </div>
+                </div>
+
                 <!-- Auto-Center Control Panel (New) -->
                 <div class="card" style="width:100%; flex:1; display:flex; flex-direction:column;">
                     <div class="card-h"><span class="card-t">🎯 Oto-Merkezleme</span></div>
@@ -83,6 +96,23 @@
                             </button>
                         </div>
 
+                        <!-- Z Control -->
+                        <!-- Quick Center Buttons -->
+                        <div style="margin:8px 0; border-bottom:1px solid var(--border)"></div>
+                        <div class="grp-label" style="font-size:0.75rem; color:#aaa">HIZLI MERKEZLEME</div>
+                        <div style="display:flex; gap:4px; margin-top:4px; overflow-x:auto">
+                            <button class="btn btn-sm ripple" style="padding:6px; flex:1"
+                                onclick="setInputAndCenter('TEST')">TEST</button>
+                            <button class="btn btn-sm ripple" style="padding:6px; flex:1"
+                                onclick="setInputAndCenter('CRB')">CRB</button>
+                            <button class="btn btn-sm ripple" style="padding:6px; flex:1"
+                                onclick="setInputAndCenter('SHN')">SHN</button>
+                            <button class="btn btn-sm ripple" style="padding:6px; flex:1"
+                                onclick="setInputAndCenter('AYD')">AYD</button>
+                            <button class="btn btn-sm ripple" style="padding:6px; flex:1"
+                                onclick="setInputAndCenter('MUS')">MUS</button>
+                        </div>
+
                         <!-- Status Display -->
                         <div id="acStatusBox"
                             style="background:rgba(0,0,0,0.3); border-radius:4px; padding:8px; margin-top:auto; height: 100px; overflow-y:auto; font-family:'JetBrains Mono'; font-size:0.75rem">
@@ -98,9 +128,9 @@
                     <img id="camFeed" src="/video_feed" alt="Kamera">
                     <!-- Overlays -->
                     <!-- TOP LEFT: Stats -->
-                    <div class="cam-stats" id="camStats">
-                        <div class="stat-item">CAM: <span id="fpsCam">--</span></div>
-                        <div class="stat-item">OCR: <span id="fpsOcr">--</span></div>
+                    <div class="cam-stats" id="camStats" style="font-size:1.1rem; font-weight:600">
+                        <div class="stat-item">CAM: <span id="fpsCam">--</span> FPS</div>
+                        <div class="stat-item">OCR: <span id="fpsOcr">--</span> FPS</div>
                     </div>
 
                     <!-- TOP RIGHT: Live Status -->
@@ -113,9 +143,13 @@
                         <div class="cam-res-badge" id="camResBadge">--×--</div>
                     </div>
 
-                    <!-- Quick Zoom REMOVED as requested -->
-                    <div class="cam-controls" style="pointer-events:none">
-                        <!-- Empty container to keep layout if needed, or remove completely -->
+                    <!-- PIP Zoom Slider -->
+                    <div class="cam-controls"
+                        style="position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.6); padding:5px 15px; border-radius:20px; display:flex; gap:10px; align-items:center; z-index:100; pointer-events:auto">
+                        <span style="color:#fff; font-size:0.8rem; font-weight:bold">PIP ZOOM</span>
+                        <input type="range" id="zoomSlider" min="1.0" max="10.0" step="0.1" value="2.0"
+                            style="width:100px; cursor:pointer" oninput="setZoom(this.value)">
+                        <span id="zoomVal" style="color:#ffeb3b; font-size:0.8rem; min-width:30px">x2.0</span>
                     </div>
 
                     <!-- Settings Overlay -->
@@ -164,8 +198,7 @@
             <div class="ctrl-right">
                 <!-- KOORDİNATLAR -->
                 <div class="card coord-card">
-                    <div class="card-h"><span class="card-t">📍 Pozisyon</span><span class="grbl-sm"
-                            id="grblSm">IDLE</span>
+                    <div class="card-h"><span class="card-t">📍 Pozisyon</span>
                     </div>
                     <div class="coord-grid">
                         <div class="coord"><span class="cl">X</span><span class="cv" id="posX">0.00</span><span
@@ -190,7 +223,7 @@
                             <div class="btn-row"><button class="btn btn-y ripple" onclick="unlockGrbl()">🔓
                                     Unlock</button><button class="btn btn-c ripple" onclick="softReset()">🔄
                                     Reset</button></div>
-                            <button class="btn btn-w ripple" onclick="emergencyStop()">🚨 ACİL DURDUR</button>
+                            <button class="btn btn-w ripple" onclick="shutdownServer()">🔌 SUNUCU KAPAT</button>
                         </div>
                     </div>
                 </div>
@@ -220,12 +253,27 @@
                         </div>
                         <div class="step-row"><span class="sl">Adım:</span>
                             <div class="step-btns">
-                                <button class="sb" onclick="setStep(0.1)">0.1</button><button class="sb"
-                                    onclick="setStep(0.5)">0.5</button>
-                                <button class="sb active" onclick="setStep(1)">1.0</button><button class="sb"
-                                    onclick="setStep(5)">5.0</button><button class="sb"
-                                    onclick="setStep(10)">10</button>
+                                <button class="sb" onclick="setStep(0.1)">0.1</button>
+                                <button class="sb" onclick="setStep(0.5)">0.5</button>
+                                <button class="sb" onclick="setStep(1)">1.0</button>
+                                <button class="sb active" onclick="setStep(5)">5.0</button>
+                                <button class="sb" onclick="setStep(10)">10</button>
+                                <button class="sb" onclick="setStep(50)">50</button>
                             </div><span class="sl">mm</span>
+                        </div>
+
+                        <!-- Z Hareketi (Moved here) -->
+                        <div style="margin:8px 10px; border-top:1px solid var(--border); padding-top:8px">
+                            <div class="grp-label" style="font-size:0.75rem; color:#aaa; margin-bottom:4px">Z HAREKETİ
+                            </div>
+                            <div style="display:flex; gap:6px">
+                                <input type="number" id="zTargetInput" class="cam-inp" placeholder="Z" style="flex:1"
+                                    value="-163">
+                                <button class="btn btn-sm ripple" onclick="moveToZ()"
+                                    style="flex:1; background:var(--blue); color:#fff; padding:6px; font-weight:bold">
+                                    İNDİR
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -243,8 +291,10 @@
                     <div class="card-h"><span class="card-t">🔍 OCR Algılama</span><span class="badge-count"
                             id="ocrCnt2">0</span></div>
                     <div class="card-b">
-                        <div class="info-row"><span>Kamera FPS</span><span class="mono" id="camFps">--</span></div>
-                        <div class="info-row"><span>OCR FPS</span><span class="mono" id="ocrFps">--</span></div>
+                        <div class="info-row"><span style="font-size:1.1rem; font-weight:600">Kamera FPS</span><span
+                                class="mono" id="camFps" style="font-size:1.1rem; font-weight:600">--</span></div>
+                        <div class="info-row"><span style="font-size:1.1rem; font-weight:600">OCR FPS</span><span
+                                class="mono" id="ocrFps" style="font-size:1.1rem; font-weight:600">--</span></div>
                         <div class="info-row"><span>Algılanan</span><span class="mono" id="detCnt">0</span></div>
                         <div class="info-row"><span>Hedef Durum</span><span id="tgtSt"
                                 class="mono tgt-search">Aranıyor</span></div>
@@ -415,6 +465,71 @@
                     </div>
                 </div>
             </div>
+            <!-- OCR AYARLARI -->
+            <div class="card">
+                <div class="card-h"><span class="card-t">🔍 OCR Ayarları</span>
+                    <button class="btn btn-p ripple" style="padding:6px 16px;font-size:13px"
+                        onclick="saveOcrConfig()">💾
+                        Kaydet</button>
+                </div>
+                <div class="card-b">
+                    <div class="cfg-grid">
+                        <div class="cfg-group">
+                            <h3>Algılama Parametreleri</h3>
+                            <div class="cfg-r"><label>OCR Güven Eşiği</label>
+                                <div style="display:flex;align-items:center;gap:8px">
+                                    <input type="range" min="10" max="100" step="5" id="cfgOcrConf" value="40"
+                                        style="flex:1" oninput="$('cfgOcrConfVal').textContent=this.value">
+                                    <span class="mono" id="cfgOcrConfVal" style="min-width:30px">40</span>
+                                </div>
+                            </div>
+                            <div class="cfg-r"><label>PSM Modu</label>
+                                <select class="cfg-in" id="cfgOcrPsm">
+                                    <option value="6">SINGLE_BLOCK (6) — Sabit Yazı</option>
+                                    <option value="11">SPARSE_TEXT (11) — Dağınık</option>
+                                    <option value="3">AUTO (3) — Otomatik</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="cfg-group">
+                            <h3>Karakter Whitelist</h3>
+                            <div class="cfg-r"><label>İzin Verilen Karakterler</label>
+                                <input type="text" class="cfg-in" id="cfgOcrWhitelist"
+                                    value="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                    style="text-transform:uppercase; font-family:'JetBrains Mono'; letter-spacing:1px">
+                            </div>
+                            <p class="card-desc" style="font-size:0.7rem; color:#888; margin-top:4px">
+                                Boş bırakılırsa tüm karakterler algılanır. Sadece büyük harf: ABCDEFGHIJKLMNOPQRSTUVWXYZ
+                            </p>
+                        </div>
+                        <div class="cfg-group">
+                            <h3>Ek Filtreler</h3>
+                            <div class="cfg-r"><label>Min. Kelime Uzunluğu</label>
+                                <div style="display:flex;align-items:center;gap:8px">
+                                    <input type="number" class="cfg-in" id="cfgMinWordLen" value="3" min="1" max="20"
+                                        step="1" style="width:80px">
+                                    <span style="font-size:0.7rem;color:#888">harf</span>
+                                </div>
+                            </div>
+                            <div class="cfg-r"><label>Kutu Büyüme Limiti</label>
+                                <div style="display:flex;align-items:center;gap:8px">
+                                    <input type="number" class="cfg-in" id="cfgBoxGrowth" value="3.0" min="1.5" max="20"
+                                        step="0.5" style="width:80px">
+                                    <span style="font-size:0.7rem;color:#888">x (ani sapıtma koruması)</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cfg-group">
+                            <h3>Başlangıç Ayarları</h3>
+                            <div class="cfg-r"><label>Açılışta Otomatik Home</label><input type="checkbox"
+                                    class="cfg-cb" id="cfgAutoHome" checked></div>
+                            <p class="card-desc" style="font-size:0.7rem; color:#888; margin-top:4px">
+                                Aktif olursa sunucu başladığında cihaz otomatik home pozisyonuna gider.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div class="card">
                 <div class="card-h"><span class="card-t">ℹ️ Sistem Bilgisi</span></div>
                 <div class="card-b">
@@ -429,7 +544,44 @@
                         <div>⬆⬇⬅➡ Motor Hareket</div>
                         <div>H — Home</div>
                         <div>C — Auto-Center</div>
-                        <div>E — Acil Durdur</div>
+                        <div>E — Sunucu Kapat</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ══════ TAB: KONUMLAR ══════ -->
+    <main class="tab-content" id="tab-bases">
+        <div class="settings-layout">
+            <!-- Sol Kolon: Yeni Konum Ekle -->
+            <div class="card">
+                <div class="card-h"><span class="card-t">➕ Yeni Konum Ekle</span></div>
+                <div class="card-b">
+                    <div class="cfg-grid">
+                        <div class="cfg-r"><label>Konum Adı</label><input type="text" class="cfg-in" id="baseName"
+                                placeholder="Örn: Home, Pick1..."></div>
+                        <div class="cfg-r"><label>X (mm)</label><input type="number" class="cfg-in" id="baseX"
+                                value="0"></div>
+                        <div class="cfg-r"><label>Y (mm)</label><input type="number" class="cfg-in" id="baseY"
+                                value="0"></div>
+                        <div class="cfg-r"><label>Z (mm)</label><input type="number" class="cfg-in" id="baseZ"
+                                value="0"></div>
+                        <div class="sep"></div>
+                        <div class="btn-row">
+                            <button class="btn btn-c ripple" onclick="fetchCurrentPos()">📍 Mevcut Konumu Çek</button>
+                            <button class="btn btn-p ripple" onclick="saveBase()">💾 Kaydet</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sağ Kolon: Kayıtlı Konumlar Listesi -->
+            <div class="card" style="grid-column: span 1">
+                <div class="card-h"><span class="card-t">📋 Kayıtlı Konumlar</span></div>
+                <div class="card-b">
+                    <div class="base-list" id="baseList">
+                        <div class="ocr-empty">Kayıtlı konum yok.</div>
                     </div>
                 </div>
             </div>

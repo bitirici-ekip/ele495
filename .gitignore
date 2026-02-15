@@ -1,6 +1,20 @@
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+env/
 venv/
 .env
+.venv/
+
+# Logs
+*.log
+cysignals_crash_logs/
+
+# VS Code
+.vscode/
+
+# System
 .DS_Store
-config.json

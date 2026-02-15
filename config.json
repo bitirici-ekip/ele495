@@ -1,0 +1,60 @@
+{
+  "pixel_to_mm_x": 0.02,
+  "pixel_to_mm_y": 0.02,
+  "target_x": 960,
+  "target_y": 540,
+  "move_step": 1.0,
+  "target_text": "TEST",
+  "target_words": [
+    "TEST",
+    "AYD",
+    "CRB",
+    "MUS",
+    "SHN"
+  ],
+  "auto_center_tolerance": 5,
+  "auto_center_max_iter": 10,
+  "invert_x": false,
+  "invert_y": false,
+  "feed_rate": 1000,
+  "camera_width": 1920,
+  "camera_height": 1080,
+  "swap_axes": false,
+  "negate_screen_x": false,
+  "negate_screen_y": false,
+  "ocr_groups": {
+    "Varsayilan": [
+      "TEST",
+      "AYD",
+      "CRB",
+      "MUS",
+      "SHN"
+    ],
+    "Bilesenler": [
+      "R1",
+      "R2",
+      "C1",
+      "C2",
+      "U1",
+      "IC1"
+    ],
+    "Etiketler": [
+      "START",
+      "STOP",
+      "ERR",
+      "OK"
+    ]
+  },
+  "target_group": "Varsayilan",
+  "fine_tune_step_mm": 0.05,
+  "fine_tune_enabled": true,
+  "stream_max_width": 800,
+  "selected_target_word": "SHN",
+  "ocr_confidence": 40,
+  "ocr_psm_mode": 6,
+  "ocr_whitelist": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+  "zoom_factor": 10.0,
+  "ocr_min_word_length": 3,
+  "box_growth_limit": 1.5,
+  "auto_home": true
+}
