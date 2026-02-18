@@ -1,102 +1,83 @@
-# ELE495 - Pick & Place Kontrol Arayüzü
+# 🤖 ELE495 - Akıllı Pick & Place Kontrol Sistemi
 
-Bu proje, ELE495 Bitirme Projesi kapsamında geliştirilmiş, **Raspberry Pi** tabanlı bir **Pick & Place (Dizgi) Makinesi** için kapsamlı bir web kontrol arayüzüdür. Flask, Socket.IO ve OpenCV teknolojileri kullanılarak geliştirilmiştir.
+![Python](https://img.shields.io/badge/Python-3.9%2B-blue?style=for-the-badge&logo=python)
+![Flask](https://img.shields.io/badge/Flask-2.0%2B-green?style=for-the-badge&logo=flask)
+![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-4%2F5-C51A4A?style=for-the-badge&logo=raspberry-pi)
+![OpenCV](https://img.shields.io/badge/OpenCV-Computer%20Vision-red?style=for-the-badge&logo=opencv)
 
-## 🚀 Özellikler
+**ELE495 Bitirme Projesi** kapsamında geliştirilen, endüstriyel standartlarda, yüksek hassasiyetli ve görüntü işleme destekli bir **Pick & Place (Dizgi) Makinesi** kontrol arayüzüdür.
 
-### 1. Web Tabanlı Kontrol Paneli
-- **Gerçek Zamanlı Kamera Akışı**: Raspberry Pi Camera Module 3 desteği ile düşük gecikmeli MJPEG yayını.
-- **İnteraktif Arayüz**: Modern, duyarlı (responsive) ve kullanıcı dostu tasarım.
-- **Motor Kontrolü**: X, Y, Z eksenleri için hassas manuel kontrol ve anlık pozisyon takibi.
+---
 
-### 2. Görüntü İşleme ve OCR (Optik Karakter Tanıma)
-- **Tesseract OCR Entegrasyonu**: Kamera görüntüsü üzerindeki metinleri (örneğin parça numaraları) gerçek zamanlı olarak okur.
-- **Otomatik Merkezleme (Auto-Center)**: Seçilen bir metni veya bileşeni görüntü işleme algoritmaları kullanarak otomatik olarak kameranın (ve dolayısıyla nozülün) merkezine hizalar.
-- **Çok Aşamalı Hizalama**: Kaba ve hassas hizalama algoritmaları ile yüksek doğruluk sağlar.
+## 🌟 Öne Çıkan Özellikler
 
-### 3. Senaryo Yönetimi
-- **Senaryo Oluşturucu**: Sürükle-bırak mantığına yakın, adım adım işlem tanımlama (Konuma Git, Merkezle, Pompa Aç/Kapat, Bekle, vb.).
-- **Senaryo Düzenleme**: Var olan senaryoları kaydetme, düzenleme ve silme imkanı.
-- **Adım Düzenleme**: Eklenmiş adımları sonradan değiştirebilme özelliği.
+### 🖥️ Profesyonel Web Arayüzü
+*   **Tam Kontrol:** Herhangi bir cihazdan (PC, Tablet, Telefon) erişilebilir modern kontrol paneli.
+*   **Canlı İzleme:** Raspberry Pi Camera Module 3 ile **düşük gecikmeli MJPEG video akışı**.
+*   **Karanlık Mod:** Göz yormayan, endüstriyel kullanıma uygun arayüz tasarımı.
 
-### 4. Sistem Kontrolü & Güvenlik
-- **GRBL Entegrasyonu**: G-Code tabanlı CNC/PnP kontrolcüleriyle tam uyum.
-- **Acil Durdurma (E-Stop)**: Yazılımsal acil durdurma ve soft-reset özellikleri.
-- **Kilit Açma ($X)**: Alarm durumunda makine kilidini açma fonksiyonu.
+### 👁️ Akıllı Görüntü İşleme (OCR & Vision)
+*   **Metin Tanıma:** Entegre **Tesseract OCR** motoru ile bileşen üzerindeki kodları anlık okuma.
+*   **Otomatik Hizalama (Auto-Center):** Kameradaki hedefi tespit edip **milimetrik hassasiyetle** merkeze getiren akıllı algoritma.
+*   **Dinamik Overlay:** Tespit edilen nesneler ve metinler video üzerinde gerçek zamanlı işaretlenir.
 
-## 🛠 Donanım Gereksinimleri
+### 🎬 Gelişmiş Senaryo Yönetimi
+*   **Sürükle-Bırak Mantığı:** Kod yazmadan karmaşık hareket senaryoları oluşturun.
+*   **Adım Düzenleme:** Senaryo adımlarını (Git, Bekle, Vakumla, Bırak) sonradan düzenleyin ve güncelleyin.
+*   **Hızlı Aksiyonlar:** Sık kullanılan senaryolara tek tıkla erişim.
 
-- **Ana Bilgisayar**: Raspberry Pi 4 veya 5 (Tavsiye edilen: 4GB+ RAM)
-- **Kamera**: Raspberry Pi Camera Module 3 (Wide veya Standard)
-- **Kontrolcü**: GRBL tabanlı CNC Shield veya benzeri kontrol kartı (Arduino Uno/Nano vb.)
-- **Mekanik**: CoreXY veya Kartezyen PnP makine şasesi
-- **Vakum Pompası**: 5V/12V Röle kontrollü vakum sistemi
+### ⚙️ Güçlü Altyapı
+*   **GRBL Uyumu:** Endüstri standardı G-Code komutları ile tam entegrasyon.
+*   **Güvenlik:** Acil Durdurma (E-Stop), Soft-Reset ve Alarm yönetimi.
+*   **Hız ve Performans:** Socket.IO ile gerçek zamanlı veri iletişimi.
 
-## 📦 Kurulum
+---
 
-Proje Python 3 tabanlıdır. Sanal ortam (venv) kullanılması önerilir.
+## 🛠️ Kurulum ve Başlangıç
 
-1. **Repoyu Klonlayın:**
-   ```bash
-   git clone https://github.com/bitirici-ekip/ele495.git
-   cd ele495
-   ```
+Bu proje **Raspberry Pi** üzerinde çalışmak üzere optimize edilmiştir.
 
-2. **Sanal Ortam Oluşturun ve Aktif Edin:**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
+### 1. Hazırlık
+Repoyu klonlayın ve proje dizinine gidin:
+```bash
+git clone https://github.com/bitirici-ekip/ele495.git
+cd ele495
+```
 
-3. **Gerekli Kütüphaneleri Yükleyin:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-   *(Not: `tesserocr` ve `picamera2` kurulumları sistem bağımlılıkları gerektirebilir. Detaylar için `requirements.txt` dosyasını inceleyiniz.)*
+### 2. Kurulum
+Sanal ortam oluşturun ve bağımlılıkları yükleyin:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-4. **Tesseract Dil Dosyaları:**
-   Sisteminizde `tesseract-ocr` ve `libtesseract-dev` paketlerinin kurulu olduğundan emin olun.
-
-## ▶️ Kullanım
-
-Uygulamayı başlatmak için:
-
+### 3. Çalıştırma
+Uygulamayı başlatın:
 ```bash
 sudo ./venv/bin/python app.py
 ```
-*(Kamera erişimi ve GPIO kontrolü için `sudo` gerekebilir, ancak modern Linux dağıtımlarında kullanıcı `gpio` ve `video` gruplarına eklenerek çözülebilir.)*
-
-Tarayıcınızdan `http://<RASPBERRY_IP>:5000` adresine giderek arayüze erişebilirsiniz.
-
-### Senaryo Adımları
-- **📍 Konuma Git**: Kayıtlı bir (X, Y, Z) noktasına hareket eder.
-- **🎯 Kelimeye Merkezle**: Belirtilen metni (OCR ile) bulur ve üzerine merkezlenir.
-- **↕️ Z Konumuna Git**: Sadece Z eksenini belirtilen yüksekliğe taşır.
-- **💨/🛑 Pompa**: Vakum pompasını açar veya kapatır.
-- **⏳ Bekle**: Belirtilen süre kadar bekler.
-- **🏠 Home**: Makineyi referans noktasına (Homing) gönderir.
-
-## 📂 Proje Yapısı
-
-```
-ele495/
-├── app.py              # Ana Flask uygulaması ve Backend mantığı
-├── requirements.txt    # Python bağımlılıkları
-├── static/             # Frontend kaynakları (CSS, JS, İkonlar)
-│   ├── app.js          # İstemci tarafı mantığı
-│   └── style.css       # Arayüz stilleri
-├── templates/          # HTML şablonları
-│   └── index.html      # Ana kontrol sayfası
-├── bases.json          # Kayıtlı konumlar veritabanı
-├── scenarios.json      # Kayıtlı senaryolar veritabanı
-└── config.json         # Sistem ayarları
-```
-
-## 👥 Katkıda Bulunanlar
-
-**Bitirici Ekip** - ELE495
-- Ali Murat
-- [Diğer Ekip Üyeleri İsimleri]
+Tarayıcınızda: `http://<RASPBERRY_IP>:5000`
 
 ---
-© 2026 Tüm Hakları Saklıdır.
+
+## 🎮 Kullanım Kılavuzu
+
+| Modül | Açıklama |
+| :--- | :--- |
+| **Manuel Kontrol** | X, Y, Z eksenlerini butonlarla veya klavye ile hassas kontrol edin. |
+| **Senaryolar** | Karmaşık montaj/dizgi işlemlerini otomatikleştirin. |
+| **Auto-Center** | "Hızlı Merkezle" paneline bir kelime girin ve makinenin o kelimeyi bulup üzerine gitmesini izleyin. |
+| **Z-Only** | "Sadece Z Git" komutu ile X/Y konumunu bozmadan yükseklik ayarı yapın. |
+
+---
+
+## 📂 Proje Mimarisi
+
+*   **Backend:** Python, Flask, Socket.IO
+*   **Görüntü İşleme:** OpenCV, Tesseract OCR, Picamera2
+*   **Frontend:** HTML5, CSS3 (JetBrains Mono & Inter fonts), Vanilla JS
+*   **Donanım:** Raspberry Pi, GRBL Controller, Step Motor Sürücüler
+
+---
+© 2026 **ELE495 Bitirme Projesi**
