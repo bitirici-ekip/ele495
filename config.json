@@ -49,7 +49,7 @@
   "fine_tune_step_mm": 0.05,
   "fine_tune_enabled": true,
   "stream_max_width": 800,
-  "selected_target_word": "SHN",
+  "selected_target_word": "CRB",
   "ocr_confidence": 40,
   "ocr_psm_mode": 6,
   "ocr_whitelist": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",

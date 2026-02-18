@@ -75,6 +75,35 @@ function initSocket() {
         showToast(d.message, d.level?.toLowerCase() || 'error');
         refreshErrors();
     });
+    socket.on('scenario_update', (d) => {
+        const box = $('scenarioStatusBox');
+        const runBtn = $('quickScenarioRunBtn');
+        const stopBtn = $('quickScenarioStopBtn');
+        if (box) {
+            box.style.display = 'block';
+            const div = document.createElement('div');
+            div.textContent = d.message;
+            div.style.color = d.status === 'error' ? '#ff6b6b' : d.status === 'done' ? '#51cf66' : d.status === 'stopped' ? '#ffa726' : '#fff';
+            div.style.padding = '2px 0';
+            div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+        if (d.status === 'started' || d.status === 'running') {
+            if (runBtn) runBtn.style.display = 'none';
+            if (stopBtn) stopBtn.style.display = '';
+
+            // Delay adımlarında popup gösterme (önceki adımın mesajı kalsın)
+            if (d.step_type !== 'delay') {
+                showOverlay(`🎬 ${d.message}`);
+            }
+        } else if (d.status === 'done' || d.status === 'error' || d.status === 'stopped') {
+            if (runBtn) runBtn.style.display = '';
+            if (stopBtn) stopBtn.style.display = 'none';
+            showOverlay(d.message);
+            setTimeout(hideOverlay, 3000);
+        }
+    });
 }
 
 /* ═══ MOTOR ═══ */
@@ -616,10 +645,14 @@ async function loadBases() {
     try {
         const r = await fetch('/api/bases').then(res => res.json());
         renderBases(r.bases || []);
+        if (typeof onStepTypeChange === 'function') onStepTypeChange();
     } catch (e) { console.error('Bases load error', e); }
 }
 
+let _basesList = []; // son yüklenen konumlar
+
 function renderBases(list) {
+    _basesList = list; // cache for edit
     // Render Table List
     const cont = $('baseList');
     if (!list.length) {
@@ -628,10 +661,11 @@ function renderBases(list) {
         let h = '<table style="width:100%; border-collapse:collapse; font-size:0.9rem">';
         h += '<tr style="border-bottom:1px solid #444; text-align:left; color:#aaa"><th style="padding:4px">İsim</th><th>X</th><th>Y</th><th>Z</th><th></th></tr>';
         list.forEach(b => {
-            h += `<tr style="border-bottom:1px solid #333">
+            h += `<tr id="baseRow_${esc(b.name)}" style="border-bottom:1px solid #333">
                 <td style="padding:8px">${esc(b.name)}</td>
                 <td>${b.x}</td><td>${b.y}</td><td>${b.z}</td>
-                <td style="text-align:right">
+                <td style="text-align:right; white-space:nowrap">
+                    <button class="btn-sm" style="background:#4caf50;color:#fff" onclick="editBase('${esc(b.name)}')">✏️</button>
                     <button class="btn-sm" style="background:#d32f2f;color:#fff" onclick="deleteBase('${esc(b.name)}')">Sil</button>
                     <button class="btn-sm" style="background:#1976d2;color:#fff" onclick="gotoBaseDirect('${esc(b.name)}')">Git</button>
                 </td>
@@ -641,11 +675,54 @@ function renderBases(list) {
         cont.innerHTML = h;
     }
 
-    // Render Dropdown
+    // Render Dropdown (if exists)
     const sel = $('quickBaseSel');
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">Seç...</option>' + list.map(b => `<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('');
-    if (cur && list.find(b => b.name === cur)) sel.value = cur;
+    if (sel) {
+        const cur = sel.value;
+        sel.innerHTML = '<option value="">Seç...</option>' + list.map(b => `<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('');
+        if (cur && list.find(b => b.name === cur)) sel.value = cur;
+    }
+}
+
+function editBase(name) {
+    const b = _basesList.find(item => item.name === name);
+    if (!b) return;
+    const row = document.getElementById('baseRow_' + name);
+    if (!row) return;
+    row.innerHTML = `
+        <td style="padding:4px"><input type="text" class="cfg-in" id="editName_${esc(name)}" value="${esc(b.name)}" style="width:80px"></td>
+        <td><input type="number" class="cfg-in" id="editX_${esc(name)}" value="${b.x}" step="0.01" style="width:70px"></td>
+        <td><input type="number" class="cfg-in" id="editY_${esc(name)}" value="${b.y}" step="0.01" style="width:70px"></td>
+        <td><input type="number" class="cfg-in" id="editZ_${esc(name)}" value="${b.z}" step="0.01" style="width:70px"></td>
+        <td style="text-align:right; white-space:nowrap">
+            <button class="btn-sm" style="background:#4caf50;color:#fff" onclick="saveEditBase('${esc(name)}')">✓</button>
+            <button class="btn-sm" style="background:#757575;color:#fff" onclick="cancelEditBase()">✗</button>
+        </td>
+    `;
+}
+
+async function saveEditBase(originalName) {
+    const newName = document.getElementById('editName_' + originalName)?.value.trim();
+    const x = parseFloat(document.getElementById('editX_' + originalName)?.value) || 0;
+    const y = parseFloat(document.getElementById('editY_' + originalName)?.value) || 0;
+    const z = parseFloat(document.getElementById('editZ_' + originalName)?.value) || 0;
+    if (!newName) { showToast('İsim boş olamaz!', 'error'); return; }
+
+    // Eğer isim değiştiyse eski kaydı sil
+    if (newName !== originalName) {
+        await fetch('/api/bases/' + encodeURIComponent(originalName), { method: 'DELETE' }).then(r => r.json());
+    }
+    const r = await api('/api/bases', { name: newName, x, y, z });
+    if (r.success) {
+        showToast('Konum güncellendi.', 'info');
+        renderBases(r.bases);
+    } else {
+        showToast('Hata: ' + r.message, 'error');
+    }
+}
+
+function cancelEditBase() {
+    renderBases(_basesList);
 }
 
 async function saveBase() {
@@ -724,3 +801,291 @@ function hideOverlay() {
 
 // Init
 loadBases();
+
+/* ═══ SCENARIOS ═══ */
+let _scenariosList = [];
+let _scenarioSteps = []; // current editor steps
+
+async function loadScenarios() {
+    try {
+        const r = await fetch('/api/scenarios').then(res => res.json());
+        _scenariosList = r.scenarios || [];
+        renderScenarioList();
+        updateScenarioDropdown();
+    } catch (e) { console.error('Scenarios load error', e); }
+}
+
+function renderScenarioList() {
+    const cont = $('scenarioList');
+    if (!cont) return;
+    if (!_scenariosList.length) {
+        cont.innerHTML = '<div class="ocr-empty">Kayıtlı senaryo yok.</div>';
+        return;
+    }
+    let h = '<table style="width:100%; border-collapse:collapse; font-size:0.9rem">';
+    h += '<tr style="border-bottom:1px solid #444; text-align:left; color:#aaa"><th style="padding:4px">İsim</th><th>Adım</th><th></th></tr>';
+    _scenariosList.forEach(s => {
+        h += `<tr style="border-bottom:1px solid #333">
+            <td style="padding:8px">${esc(s.name)}</td>
+            <td>${s.steps ? s.steps.length : 0}</td>
+            <td style="text-align:right; white-space:nowrap">
+                <button class="btn-sm" style="background:#4caf50;color:#fff" onclick="editScenario('${esc(s.name)}')">✏️</button>
+                <button class="btn-sm" style="background:#d32f2f;color:#fff" onclick="deleteScenario('${esc(s.name)}')">Sil</button>
+                <button class="btn-sm" style="background:#1976d2;color:#fff" onclick="runScenarioByName('${esc(s.name)}')">▶ Çalıştır</button>
+            </td>
+         </tr>`;
+    });
+    h += '</table>';
+    cont.innerHTML = h;
+}
+
+function updateScenarioDropdown() {
+    const sel = $('quickScenarioSel');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Senaryo seç...</option>' + _scenariosList.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+    if (cur && _scenariosList.find(s => s.name === cur)) sel.value = cur;
+}
+
+// — Step Builder —
+let _editingStepIndex = -1;
+
+function onStepTypeChange() {
+    const type = $('stepType').value;
+    const box = $('stepParamBox');
+    if (type === 'goto_base') {
+        let opts = _basesList.map(b => `<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('');
+        box.innerHTML = `<select class="cfg-in" id="stepBaseSelect">${opts}</select>`;
+        box.style.display = '';
+    } else if (type === 'auto_center') {
+        box.innerHTML = `<input type="text" class="cfg-in" id="stepWordInput" placeholder="Kelime..." style="text-transform:uppercase">`;
+        box.style.display = '';
+    } else if (type === 'delay') {
+        box.innerHTML = `<input type="number" class="cfg-in" id="stepDelayInput" placeholder="Saniye" value="5" min="0.5" step="0.5">`;
+        box.style.display = '';
+    } else if (type === 'move_z') {
+        box.innerHTML = `<input type="number" class="cfg-in" id="stepZInput" placeholder="Z (mm)" value="-163">`;
+        box.style.display = '';
+    } else {
+        box.innerHTML = '';
+        box.style.display = 'none';
+    }
+}
+
+function addScenarioStep() {
+    const type = $('stepType').value;
+    let step = { type };
+
+    if (type === 'goto_base') {
+        const sel = $('stepBaseSelect');
+        if (!sel || !sel.value) { showToast('Konum seçin!', 'error'); return; }
+        step.base_name = sel.value;
+    } else if (type === 'auto_center') {
+        const inp = $('stepWordInput');
+        const w = inp ? inp.value.trim().toUpperCase() : '';
+        if (!w) { showToast('Kelime girin!', 'error'); return; }
+        step.word = w;
+    } else if (type === 'delay') {
+        const inp = $('stepDelayInput');
+        const s = parseFloat(inp ? inp.value : 1) || 1;
+        step.seconds = s;
+    } else if (type === 'move_z') {
+        const inp = $('stepZInput');
+        const z = parseFloat(inp ? inp.value : 0);
+        if (isNaN(z)) { showToast('Geçerli Z değeri girin!', 'error'); return; }
+        step.z = z;
+    }
+
+    if (_editingStepIndex >= 0) {
+        _scenarioSteps[_editingStepIndex] = step;
+        _editingStepIndex = -1;
+        const btn = $('addStepBtn');
+        if (btn) {
+            btn.innerHTML = '+ Ekle';
+            btn.style.background = '';
+        }
+    } else {
+        _scenarioSteps.push(step);
+    }
+    renderScenarioSteps();
+}
+
+function editScenarioStep(idx) {
+    if (idx < 0 || idx >= _scenarioSteps.length) return;
+    const step = _scenarioSteps[idx];
+    _editingStepIndex = idx;
+
+    // Set type and render inputs
+    const typeSel = $('stepType');
+    if (typeSel) {
+        typeSel.value = step.type;
+        onStepTypeChange();
+    }
+
+    // Populate inputs
+    setTimeout(() => { // ensure DOM update
+        if (step.type === 'goto_base') {
+            const sel = $('stepBaseSelect');
+            if (sel) sel.value = step.base_name;
+        } else if (step.type === 'auto_center') {
+            const inp = $('stepWordInput');
+            if (inp) inp.value = step.word;
+        } else if (step.type === 'delay') {
+            const inp = $('stepDelayInput');
+            if (inp) inp.value = step.seconds;
+        } else if (step.type === 'move_z') {
+            const inp = $('stepZInput');
+            if (inp) inp.value = step.z;
+        }
+    }, 0);
+
+    // Update button text
+    const btn = $('addStepBtn');
+    if (btn) {
+        btn.innerHTML = '📝 Güncelle';
+        btn.style.background = 'var(--orange)';
+    }
+}
+
+function removeScenarioStep(idx) {
+    if (_editingStepIndex === idx) {
+        _editingStepIndex = -1;
+        const btn = $('addStepBtn');
+        if (btn) {
+            btn.innerHTML = '+ Ekle';
+            btn.style.background = '';
+        }
+    } else if (_editingStepIndex > idx) {
+        _editingStepIndex--;
+    }
+    _scenarioSteps.splice(idx, 1);
+    renderScenarioSteps();
+}
+
+function moveScenarioStep(idx, dir) {
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= _scenarioSteps.length) return;
+
+    // Update editing index if moved
+    if (_editingStepIndex === idx) _editingStepIndex = newIdx;
+    else if (_editingStepIndex === newIdx) _editingStepIndex = idx;
+
+    const tmp = _scenarioSteps[idx];
+    _scenarioSteps[idx] = _scenarioSteps[newIdx];
+    _scenarioSteps[newIdx] = tmp;
+    renderScenarioSteps();
+}
+
+function clearScenarioSteps() {
+    _scenarioSteps = [];
+    _editingStepIndex = -1;
+    const btn = $('addStepBtn');
+    if (btn) {
+        btn.innerHTML = '+ Ekle';
+        btn.style.background = '';
+    }
+    $('scenarioName').value = '';
+    renderScenarioSteps();
+}
+
+function stepLabel(step) {
+    const t = step.type;
+    if (t === 'goto_base') return `📍 ${step.base_name} konumuna git`;
+    if (t === 'auto_center') return `🎯 '${step.word}' kelimesine merkezle`;
+    if (t === 'pump_on') return '💨 Pompa AÇ';
+    if (t === 'pump_off') return '🛑 Pompa KAPAT';
+    if (t === 'delay') return `⏳ ${step.seconds}s bekle`;
+    if (t === 'move_z') return `↕️ Z: ${step.z}mm konumuna git`;
+    if (t === 'home') return '🏠 Home';
+    return `❓ ${t}`;
+}
+
+function renderScenarioSteps() {
+    const cont = $('scenarioStepList');
+    if (!cont) return;
+    if (!_scenarioSteps.length) {
+        cont.innerHTML = '<div class="ocr-empty">Henüz adım eklenmedi.</div>';
+        return;
+    }
+    let h = '';
+    _scenarioSteps.forEach((s, i) => {
+        const bg = (i === _editingStepIndex) ? 'rgba(245, 158, 11, 0.1)' : 'transparent';
+        const border = (i === _editingStepIndex) ? '1px solid var(--orange)' : '1px solid rgba(255,255,255,0.06)';
+
+        h += `<div style="display:flex; align-items:center; gap:6px; padding:6px 8px; border-bottom:${border}; background:${bg}; font-size:0.85rem">
+            <span style="color:#666; font-weight:600; min-width:24px">${i + 1}.</span>
+            <span style="flex:1">${stepLabel(s)}</span>
+            <button class="btn-sm" onclick="editScenarioStep(${i})" style="padding:2px 6px; font-size:0.7rem; background:var(--blue); color:#fff" title="Düzenle">✎</button>
+            <button class="btn-sm" onclick="moveScenarioStep(${i},-1)" style="padding:2px 6px; font-size:0.7rem" title="Yukarı">▲</button>
+            <button class="btn-sm" onclick="moveScenarioStep(${i},1)" style="padding:2px 6px; font-size:0.7rem" title="Aşağı">▼</button>
+            <button class="btn-sm" style="background:#d32f2f;color:#fff; padding:2px 6px; font-size:0.7rem" onclick="removeScenarioStep(${i})">✗</button>
+        </div>`;
+    });
+    cont.innerHTML = h;
+}
+
+// — CRUD —
+async function saveScenario() {
+    const name = $('scenarioName').value.trim();
+    if (!name) { showToast('Senaryo adı gerekli!', 'error'); return; }
+    if (!_scenarioSteps.length) { showToast('En az bir adım ekleyin!', 'error'); return; }
+
+    const r = await api('/api/scenarios', { name, steps: _scenarioSteps });
+    if (r.success) {
+        showToast('Senaryo kaydedildi.', 'info');
+        _scenariosList = r.scenarios;
+        renderScenarioList();
+        updateScenarioDropdown();
+        clearScenarioSteps();
+    } else {
+        showToast('Hata: ' + r.message, 'error');
+    }
+}
+
+async function deleteScenario(name) {
+    if (!confirm(name + ' silinsin mi?')) return;
+    const r = await fetch('/api/scenarios/' + encodeURIComponent(name), { method: 'DELETE' }).then(res => res.json());
+    if (r.success) {
+        showToast('Senaryo silindi.', 'info');
+        _scenariosList = r.scenarios;
+        renderScenarioList();
+        updateScenarioDropdown();
+    } else {
+        showToast('Hata: ' + r.message, 'error');
+    }
+}
+
+function editScenario(name) {
+    const s = _scenariosList.find(item => item.name === name);
+    if (!s) return;
+    $('scenarioName').value = s.name;
+    _scenarioSteps = JSON.parse(JSON.stringify(s.steps || []));
+    renderScenarioSteps();
+    switchTab('scenarios');
+    showToast(`'${name}' düzenleme modunda.`, 'info');
+}
+
+// — Execution —
+async function runScenarioByName(name) {
+    const r = await api('/api/scenario/run', { name });
+    if (r.success) {
+        showToast(r.message, 'info');
+    } else {
+        showToast(r.message, 'error');
+    }
+}
+
+async function quickRunScenario() {
+    const name = $('quickScenarioSel').value;
+    if (!name) { showToast('Senaryo seçin!', 'error'); return; }
+    runScenarioByName(name);
+}
+
+async function stopScenario() {
+    const r = await api('/api/scenario/stop');
+    showToast(r.message, r.success ? 'info' : 'error');
+}
+
+// — Init —
+loadScenarios();
+onStepTypeChange(); // init param box

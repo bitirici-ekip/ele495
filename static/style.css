@@ -473,7 +473,7 @@ body {
 }
 
 .btn-sm {
-    padding: 3px 10px;
+    padding: 3px 8px;
     border-radius: 5px;
     border: 1px solid var(--border);
     background: transparent;
@@ -747,14 +747,14 @@ body {
 
 .cam-inp {
     width: 70px;
-    padding: 8px;
+    padding: 4px;
     border-radius: 6px;
     border: 1px solid var(--border);
     background: var(--bg);
     color: var(--text);
     text-align: center;
     font-family: 'JetBrains Mono';
-    font-size: 0.9rem
+    font-size: 0.8rem
 }
 
 .cam-x {

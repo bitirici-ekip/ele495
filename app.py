@@ -129,7 +129,7 @@ class Config:
     OCR_MIN_WORD_LENGTH = 3
 
     # Kutu Büyüme Limiti (Ani sapıtma koruması — bu kattan fazla büyüyen kutular reddedilir)
-    BOX_GROWTH_LIMIT = 3.0
+    BOX_GROWTH_LIMIT = 1.5
 
     # Açılışta Otomatik Home
     AUTO_HOME = True
@@ -149,7 +149,9 @@ class Config:
     # Konfigürasyon dosya yolu
     CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
     BASES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bases.json')
+    SCENARIOS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scenarios.json')
     BASES = []
+    SCENARIOS = []
 
     def to_dict(self):
         """JSON olarak döndür."""
@@ -287,10 +289,45 @@ class Config:
         except Exception as e:
             log.error(f"Bases kayıt hatası: {e}")
 
+    def load_scenarios(self):
+        """Senaryoları dosyadan yükle."""
+        try:
+            if os.path.exists(self.SCENARIOS_FILE):
+                with open(self.SCENARIOS_FILE, 'r') as f:
+                    content = f.read().strip()
+                if content:
+                    try:
+                        self.SCENARIOS = json.loads(content)
+                        log.info(f"{len(self.SCENARIOS)} adet senaryo yüklendi.")
+                    except json.JSONDecodeError:
+                        log.error("Scenarios JSON hatası!")
+                        self.SCENARIOS = []
+                else:
+                    self.SCENARIOS = []
+            else:
+                self.SCENARIOS = []
+        except Exception as e:
+            log.error(f"Senaryo yükleme hatası: {e}")
+            self.SCENARIOS = []
+
+    def save_scenarios(self):
+        """Senaryoları güvenli kaydet."""
+        try:
+            temp_file = self.SCENARIOS_FILE + ".tmp"
+            with open(temp_file, 'w') as f:
+                json.dump(self.SCENARIOS, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_file, self.SCENARIOS_FILE)
+            log.info(f"Senaryolar kaydedildi: {len(self.SCENARIOS)} adet")
+        except Exception as e:
+            log.error(f"Senaryo kayıt hatası: {e}")
+
 # Global config nesnesi
 config = Config()
 config.load_config()
 config.load_bases()
+config.load_scenarios()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -797,13 +834,32 @@ class CameraManager:
                     best_score = score
                     best_id = bid
 
+            if best_id is None:
+                # ── Fallback Matching (Yedek Eşleştirme) ──
+                # IoU tutmadı ama belki kutu çok büyüdü/küçüldü veya hafif kaydı.
+                # Eğer aynı metin ve merkez noktası çok yakınsa, yine de eşleştir.
+                for bid, sbox in self.stable_boxes.items():
+                    # Aynı metin mi?
+                    if sbox['text'] == det['text']:
+                        # Merkezleri yakın mı? (Örn: 50px içinde)
+                        ocx = sbox['rect'][0] + sbox['rect'][2]/2
+                        ocy = sbox['rect'][1] + sbox['rect'][3]/2
+                        ncx = det['rect'][0] + det['rect'][2]/2
+                        ncy = det['rect'][1] + det['rect'][3]/2
+                        dist = ((ocx-ncx)**2 + (ocy-ncy)**2)**0.5
+                        
+                        if dist < 50:
+                            best_id = bid
+                            break
+
             if best_id is not None:
-                # Aniden 3x'ten fazla büyüyen kutuları reddet (sapıtma koruması)
+                # Aniden 1.5x'ten fazla büyüyen kutuları reddet (sapıtma koruması)
                 old_rect = self.stable_boxes[best_id]['rect']
                 old_area = old_rect[2] * old_rect[3]
                 new_area = det['rect'][2] * det['rect'][3]
+                
+                # Eğer çok büyüdüyse, sadece 'görüldü' bilgisini güncelle, koordinatları güncelleme
                 if old_area > 0 and new_area > old_area * config.BOX_GROWTH_LIMIT:
-                    # Anormal büyüme — sadece last_seen güncelle, rect değiştirme
                     self.stable_boxes[best_id]['last_seen'] = now
                 else:
                     self.stable_boxes[best_id]['rect'] = det['rect']
@@ -1169,12 +1225,12 @@ class CameraManager:
             ])
             return jpeg.tobytes()
 
-    def find_target_text(self):
+    def find_target_text(self, specific_word=None):
         """
         Hedef yazıları OCR sonuçlarından bul.
         Birden fazla eşleşme varsa ekran merkezine en yakın olanı döndürür.
         """
-        target_exact = config.SELECTED_TARGET_WORD.strip()
+        target_exact = specific_word.strip() if specific_word else config.SELECTED_TARGET_WORD.strip()
         # Ekran merkezi (180 derece olduğu için en/boy değişmez)
         center_x = config.CAMERA_WIDTH // 2
         center_y = config.CAMERA_HEIGHT // 2
@@ -1267,11 +1323,11 @@ def auto_center(camera: CameraManager, pnp: PNPDriver, socketio: SocketIO, targe
             (0, -scan_step_wide), (0, -scan_step_wide),
         ]
 
-        def search_target(max_wait=3, scan_pattern=None):
+        def search_target(scan_word, max_wait=3, scan_pattern=None):
             """Hedef yazıyı ara: önce bekle, bulamazsa tarama yap."""
             for wait_try in range(max_wait):
                 time.sleep(0.8)
-                t = camera.find_target_text()
+                t = camera.find_target_text(scan_word)
                 if t is not None:
                     return t
                 emit('moving', f"OCR taranıyor... ({wait_try+1}/{max_wait})")
@@ -1284,7 +1340,7 @@ def auto_center(camera: CameraManager, pnp: PNPDriver, socketio: SocketIO, targe
                 motor_dx, motor_dy = screen_to_motor(sdx, sdy)
                 pnp.move_relative(dx=motor_dx, dy=motor_dy)
                 time.sleep(0.8)
-                t = camera.find_target_text()
+                t = camera.find_target_text(scan_word)
                 if t is not None:
                     emit('moving', f"Hedef bulundu! (tarama adım {si+1}/{len(scan_pattern)})")
                     return t
@@ -1301,11 +1357,11 @@ def auto_center(camera: CameraManager, pnp: PNPDriver, socketio: SocketIO, targe
         # ══════════════════════════════════════════
         emit('started', f"'{what_to_search}' aranıyor...", phase="AŞAMA 0")
         time.sleep(0.5)
-        target = camera.find_target_text()
+        target = camera.find_target_text(what_to_search)
 
         if target is None:
             emit('moving', f"'{what_to_search}' ekranda yok — geniş tarama başlatılıyor...", phase="AŞAMA 0")
-            target = search_target(max_wait=2, scan_pattern=scan_pattern_wide)
+            target = search_target(what_to_search, max_wait=2, scan_pattern=scan_pattern_wide)
             if target is None:
                 emit('error', f"'{what_to_search}' hiçbir yerde bulunamadı!", phase="AŞAMA 0")
                 return
@@ -1323,10 +1379,10 @@ def auto_center(camera: CameraManager, pnp: PNPDriver, socketio: SocketIO, targe
 
         for iteration in range(config.AUTO_CENTER_MAX_ITER):
             time.sleep(0.5)
-            target = camera.find_target_text()
+            target = camera.find_target_text(what_to_search)
             if target is None:
                 emit('moving', f"Hedef kayıp — yeniden aranıyor (iterasyon {iteration+1})...", phase="AŞAMA 1")
-                target = search_target(max_wait=3, scan_pattern=scan_pattern_small if iteration < 3 else None)
+                target = search_target(what_to_search, max_wait=3, scan_pattern=scan_pattern_small if iteration < 3 else None)
                 if target is None:
                     emit('error', f"Hedef kayboldu ve bulunamadı! ({what_to_search})", phase="AŞAMA 1")
                     return
@@ -1369,10 +1425,10 @@ def auto_center(camera: CameraManager, pnp: PNPDriver, socketio: SocketIO, targe
 
             for i in range(5):
                 time.sleep(0.5)
-                target = camera.find_target_text()
+                target = camera.find_target_text(what_to_search)
                 if not target:
                     emit('moving', "Hassas aşamada hedef kayıp — bekleniyor...", phase="AŞAMA 2")
-                    target = search_target(max_wait=2, scan_pattern=None)
+                    target = search_target(what_to_search, max_wait=2, scan_pattern=None)
                     if not target:
                         emit('moving', "Hedef kaybedildi, mevcut konumla devam.", phase="AŞAMA 2")
                         break
@@ -1405,7 +1461,7 @@ def auto_center(camera: CameraManager, pnp: PNPDriver, socketio: SocketIO, targe
         # ══════════════════════════════════════════
         emit('moving', "Son kontrol yapılıyor...", phase="AŞAMA 3")
         time.sleep(1.0)
-        target = camera.find_target_text()
+        target = camera.find_target_text(what_to_search)
 
         if target:
             cx, cy = target['center']
@@ -1715,21 +1771,223 @@ def api_delete_base(name):
 
 @app.route('/api/goto_base', methods=['POST'])
 def api_goto_base():
-    """Kayıtlı konuma git (Güvenli: Önce Z, Sonra XY)."""
+    """Kayıtlı konuma git (Akıllı Z sıralaması)."""
     data = request.get_json()
     name = data.get('name')
     target = next((b for b in config.BASES if b['name'] == name), None)
     
     if target:
-        # 1. Z Ekseni Hareketi (Güvenlik Önceliği)
-        pnp.move_absolute(z=target['z'])
-        # 2. X ve Y Ekseni Hareketi
-        success = pnp.move_absolute(x=target['x'], y=target['y'])
+        current_z = pnp.current_z  # Mevcut Z pozisyonu
+        target_z = target['z']
+        
+        if target_z < current_z:
+            # Z aşağı gidecek → çarpışma riski: önce XY, sonra Z indir
+            log.info(f"Goto '{name}': Z aşağı ({current_z:.2f} → {target_z:.2f}), sıra: XY → Z")
+            pnp.move_absolute(x=target['x'], y=target['y'])
+            success = pnp.move_absolute(z=target_z)
+            order_msg = "XY → Z"
+        else:
+            # Z yukarı gidecek veya aynı → güvenli: önce Z yukarı, sonra XY
+            log.info(f"Goto '{name}': Z yukarı ({current_z:.2f} → {target_z:.2f}), sıra: Z → XY")
+            pnp.move_absolute(z=target_z)
+            success = pnp.move_absolute(x=target['x'], y=target['y'])
+            order_msg = "Z → XY"
         
         socketio.emit('motor_update', pnp.get_status())
-        return jsonify({'success': success, 'message': f"'{name}' konumuna varıldı (Z -> XY)."})
+        return jsonify({'success': success, 'message': f"'{name}' konumuna varıldı ({order_msg})."})
     
     return jsonify({'success': False, 'message': 'Konum bulunamadı'})
+
+
+# ── Senaryo Çalıştırma Altyapısı ─────────────────────────────────────────────
+scenario_running = False
+scenario_stop_flag = False
+
+def run_scenario(scenario, pnp_ref, camera_ref, socketio_ref):
+    """Senaryoyu arka planda adım adım çalıştır."""
+    global scenario_running, scenario_stop_flag
+    scenario_running = True
+    scenario_stop_flag = False
+    name = scenario.get('name', 'İsimsiz')
+    steps = scenario.get('steps', [])
+
+    def emit(status, message, step_index=-1):
+        socketio_ref.emit('scenario_update', {
+            'status': status,
+            'message': message,
+            'step_index': step_index,
+            'total_steps': len(steps),
+            'step_type': steps[step_index]['type'] if 0 <= step_index < len(steps) else None,
+            'scenario_name': name
+        })
+
+    try:
+        emit('started', f"Senaryo '{name}' başlatıldı ({len(steps)} adım)")
+        log.info(f"Senaryo başlatıldı: {name} ({len(steps)} adım)")
+
+        for i, step in enumerate(steps):
+            if scenario_stop_flag:
+                emit('stopped', f"Senaryo durduruldu (adım {i+1}/{len(steps)}).")
+                log.info(f"Senaryo durduruldu: {name}")
+                return
+
+            stype = step.get('type')
+            emit('running', f"Adım {i+1}/{len(steps)}: {_step_description(step)}", i)
+
+            if stype == 'goto_base':
+                base_name = step.get('base_name', '')
+                target = next((b for b in config.BASES if b['name'] == base_name), None)
+                if target:
+                    current_z = pnp_ref.current_z
+                    target_z = target['z']
+                    if target_z < current_z:
+                        pnp_ref.move_absolute(x=target['x'], y=target['y'])
+                        pnp_ref.move_absolute(z=target_z)
+                    else:
+                        pnp_ref.move_absolute(z=target_z)
+                        pnp_ref.move_absolute(x=target['x'], y=target['y'])
+                    socketio_ref.emit('motor_update', pnp_ref.get_status())
+                else:
+                    emit('warning', f"Konum bulunamadı: {base_name}", i)
+
+            elif stype == 'auto_center':
+                word = step.get('word', '')
+                if word:
+                    emit('running', f"'{word}' kelimesine merkezleniyor...", i)
+                    auto_center(camera_ref, pnp_ref, socketio_ref, word)
+                else:
+                    emit('warning', "Merkezleme kelimesi boş!", i)
+
+            elif stype == 'pump_on':
+                pnp_ref.pump(True)
+                emit('running', "Pompa açıldı.", i)
+
+            elif stype == 'pump_off':
+                pnp_ref.pump(False)
+                emit('running', "Pompa kapatıldı.", i)
+
+            elif stype == 'delay':
+                secs = float(step.get('seconds', 1))
+                emit('running', f"{secs}s bekleniyor...", i)
+                # Bekleme sırasında durdurma kontrolü
+                waited = 0
+                while waited < secs:
+                    if scenario_stop_flag:
+                        emit('stopped', "Senaryo durduruldu (bekleme sırasında).")
+                        return
+                    time.sleep(min(0.5, secs - waited))
+                    waited += 0.5
+
+            elif stype == 'home':
+                pnp_ref.home()
+                emit('running', "Home'a gidildi.", i)
+                time.sleep(0.5)
+                socketio_ref.emit('motor_update', pnp_ref.get_status())
+
+            elif stype == 'move_z':
+                z_val = float(step.get('z', 0))
+                emit('running', f"Z ekseni {z_val}mm konumuna gidiliyor...", i)
+                pnp_ref.move_absolute(z=z_val)
+                socketio_ref.emit('motor_update', pnp_ref.get_status())
+
+            else:
+                emit('warning', f"Bilinmeyen komut tipi: {stype}", i)
+
+            time.sleep(0.3)  # Adımlar arası kısa mola
+
+        emit('done', f"Senaryo '{name}' tamamlandı ✓")
+        log.info(f"Senaryo tamamlandı: {name}")
+
+    except Exception as e:
+        emit('error', f"Senaryo hatası: {e}")
+        log.error(f"Senaryo hatası ({name}): {e}")
+    finally:
+        scenario_running = False
+
+
+def _step_description(step):
+    """Adım için okunabilir açıklama döndür."""
+    t = step.get('type', '?')
+    if t == 'goto_base': return f"📍 {step.get('base_name', '?')} konumuna git"
+    if t == 'auto_center': return f"🎯 '{step.get('word', '?')}' kelimesine merkezle"
+    if t == 'pump_on': return "💨 Pompa AÇ"
+    if t == 'pump_off': return "🛑 Pompa KAPAT"
+    if t == 'delay': return f"⏳ {step.get('seconds', 1)}s bekle"
+    if t == 'move_z': return f"↕️ Z: {step.get('z', 0)}mm konumuna git"
+    if t == 'home': return "🏠 Home pozisyonuna git"
+    return f"❓ {t}"
+
+
+@app.route('/api/scenarios', methods=['GET', 'POST'])
+def api_scenarios():
+    """Senaryoları listele veya yeni ekle/güncelle."""
+    if request.method == 'POST':
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': True, 'scenarios': config.SCENARIOS})
+        name = data.get('name')
+        if not name:
+            return jsonify({'success': False, 'message': 'Senaryo adı gerekli'})
+        steps = data.get('steps', [])
+        entry = {'name': name, 'steps': steps}
+
+        # Aynı isimde varsa güncelle
+        exists = False
+        for i, s in enumerate(config.SCENARIOS):
+            if s['name'] == name:
+                config.SCENARIOS[i] = entry
+                exists = True
+                break
+        if not exists:
+            config.SCENARIOS.append(entry)
+
+        config.save_scenarios()
+        return jsonify({'success': True, 'message': 'Senaryo kaydedildi', 'scenarios': config.SCENARIOS})
+
+    return jsonify({'success': True, 'scenarios': config.SCENARIOS})
+
+
+@app.route('/api/scenarios/<name>', methods=['DELETE'])
+def api_delete_scenario(name):
+    """Senaryoyu sil."""
+    original_len = len(config.SCENARIOS)
+    config.SCENARIOS = [s for s in config.SCENARIOS if s['name'] != name]
+    if len(config.SCENARIOS) < original_len:
+        config.save_scenarios()
+        return jsonify({'success': True, 'message': 'Senaryo silindi', 'scenarios': config.SCENARIOS})
+    return jsonify({'success': False, 'message': 'Senaryo bulunamadı'})
+
+
+@app.route('/api/scenario/run', methods=['POST'])
+def api_run_scenario():
+    """Senaryoyu arka planda çalıştır."""
+    global scenario_running
+    if scenario_running:
+        return jsonify({'success': False, 'message': 'Bir senaryo zaten çalışıyor!'})
+
+    data = request.get_json()
+    name = data.get('name')
+    scenario = next((s for s in config.SCENARIOS if s['name'] == name), None)
+    if not scenario:
+        return jsonify({'success': False, 'message': 'Senaryo bulunamadı'})
+
+    threading.Thread(
+        target=run_scenario,
+        args=(scenario, pnp, camera, socketio),
+        daemon=True
+    ).start()
+    return jsonify({'success': True, 'message': f"Senaryo '{name}' başlatıldı"})
+
+
+@app.route('/api/scenario/stop', methods=['POST'])
+def api_scenario_stop():
+    """Çalışan senaryoyu durdur."""
+    global scenario_stop_flag
+    if not scenario_running:
+        return jsonify({'success': False, 'message': 'Çalışan senaryo yok'})
+    scenario_stop_flag = True
+    return jsonify({'success': True, 'message': 'Durdurma sinyali gönderildi'})
+
 
 @app.route('/api/config', methods=['POST'])
 @login_required

@@ -1,0 +1,60 @@
+[
+  {
+    "name": "AYD to D2",
+    "steps": [
+      {
+        "base_name": "KOMPONENT BASE",
+        "type": "goto_base"
+      },
+      {
+        "seconds": 5,
+        "type": "delay"
+      },
+      {
+        "type": "auto_center",
+        "word": "AYD"
+      },
+      {
+        "seconds": 7,
+        "type": "delay"
+      },
+      {
+        "type": "move_z",
+        "z": -166
+      },
+      {
+        "seconds": 20,
+        "type": "delay"
+      },
+      {
+        "type": "pump_on"
+      },
+      {
+        "seconds": 5,
+        "type": "delay"
+      },
+      {
+        "base_name": "PCB BASE",
+        "type": "goto_base"
+      },
+      {
+        "seconds": 10,
+        "type": "delay"
+      },
+      {
+        "base_name": "D2 PCB",
+        "type": "goto_base"
+      },
+      {
+        "seconds": 20,
+        "type": "delay"
+      },
+      {
+        "type": "pump_off"
+      },
+      {
+        "type": "home"
+      }
+    ]
+  }
+]

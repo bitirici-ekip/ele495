@@ -1,85 +1,102 @@
-# PNP Control Center v2.0
-> **Pick & Place Control Interface for Raspberry Pi**
+# ELE495 - Pick & Place Kontrol Arayüzü
 
-![Status](https://img.shields.io/badge/Status-Active-success)
-![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi-red)
-![Python](https://img.shields.io/badge/Python-3.9+-blue)
+Bu proje, ELE495 Bitirme Projesi kapsamında geliştirilmiş, **Raspberry Pi** tabanlı bir **Pick & Place (Dizgi) Makinesi** için kapsamlı bir web kontrol arayüzüdür. Flask, Socket.IO ve OpenCV teknolojileri kullanılarak geliştirilmiştir.
 
-PNP Control Center is a comprehensive web-based interface for controlling Pick & Place machines powered by GRBL controllers and Raspberry Pi. It features real-time camera streaming with OCR capabilities, precise motor control, and an intuitive modern UI.
+## 🚀 Özellikler
 
-## 🌟 Key Features
+### 1. Web Tabanlı Kontrol Paneli
+- **Gerçek Zamanlı Kamera Akışı**: Raspberry Pi Camera Module 3 desteği ile düşük gecikmeli MJPEG yayını.
+- **İnteraktif Arayüz**: Modern, duyarlı (responsive) ve kullanıcı dostu tasarım.
+- **Motor Kontrolü**: X, Y, Z eksenleri için hassas manuel kontrol ve anlık pozisyon takibi.
 
-### 🎮 Machine Control
-- **Full Axis Control:** Precise X, Y, Z movement with adjustable step sizes (0.1mm - 50mm)
-- **GRBL Integration:** Direct G-code sending, alarm handling, and real-time status monitoring
-- **Smart Homing:** Auto-home capability on startup or demand
-- **Pump Control:** Integrated vacuum pump switching
+### 2. Görüntü İşleme ve OCR (Optik Karakter Tanıma)
+- **Tesseract OCR Entegrasyonu**: Kamera görüntüsü üzerindeki metinleri (örneğin parça numaraları) gerçek zamanlı olarak okur.
+- **Otomatik Merkezleme (Auto-Center)**: Seçilen bir metni veya bileşeni görüntü işleme algoritmaları kullanarak otomatik olarak kameranın (ve dolayısıyla nozülün) merkezine hizalar.
+- **Çok Aşamalı Hizalama**: Kaba ve hassas hizalama algoritmaları ile yüksek doğruluk sağlar.
 
-### 👁️ Computer Vision & OCR
-- **Live Stream:** High-performance MJPEG streaming with low latency
-- **OCR Engine:** Tesseract-based optical character recognition for component identification
-- **Smart Filtering:** 
-  - Minimum word length filtering
-  - Bounding box stability checks
-  - Ignore list configuration
-- **PIP Zoom:** Picture-in-Picture zoom window with live annotations
-- **Auto-Centering:** Automatically aligns the machine head with recognized text/components using visual feedback
+### 3. Senaryo Yönetimi
+- **Senaryo Oluşturucu**: Sürükle-bırak mantığına yakın, adım adım işlem tanımlama (Konuma Git, Merkezle, Pompa Aç/Kapat, Bekle, vb.).
+- **Senaryo Düzenleme**: Var olan senaryoları kaydetme, düzenleme ve silme imkanı.
+- **Adım Düzenleme**: Eklenmiş adımları sonradan değiştirebilme özelliği.
 
-### ⚙️ Configuration & Customization
-- **Web-based Settings:** Configure camera resolution, motor steps, and OCR parameters directly from the UI
-- **Calibration Wizard:** Step-by-step visual calibration for camera-to-motor coordinate mapping
-- **Theme Support:** Dark/Light mode toggle
-- **Position Memory:** Save and recall specific machine coordinates (Bases)
+### 4. Sistem Kontrolü & Güvenlik
+- **GRBL Entegrasyonu**: G-Code tabanlı CNC/PnP kontrolcüleriyle tam uyum.
+- **Acil Durdurma (E-Stop)**: Yazılımsal acil durdurma ve soft-reset özellikleri.
+- **Kilit Açma ($X)**: Alarm durumunda makine kilidini açma fonksiyonu.
 
-## 🛠️ Installation
+## 🛠 Donanım Gereksinimleri
 
-### Prerequisites
-- Raspberry Pi (4 or 5 recommended)
-- Python 3.9+
-- Tesseract OCR (`sudo apt install tesseract-ocr libtesseract-dev`)
-- GRBL-based CNC Controller connected via USB
+- **Ana Bilgisayar**: Raspberry Pi 4 veya 5 (Tavsiye edilen: 4GB+ RAM)
+- **Kamera**: Raspberry Pi Camera Module 3 (Wide veya Standard)
+- **Kontrolcü**: GRBL tabanlı CNC Shield veya benzeri kontrol kartı (Arduino Uno/Nano vb.)
+- **Mekanik**: CoreXY veya Kartezyen PnP makine şasesi
+- **Vakum Pompası**: 5V/12V Röle kontrollü vakum sistemi
 
-### Setup
-1. **Clone the repository:**
+## 📦 Kurulum
+
+Proje Python 3 tabanlıdır. Sanal ortam (venv) kullanılması önerilir.
+
+1. **Repoyu Klonlayın:**
    ```bash
    git clone https://github.com/bitirici-ekip/ele495.git
    cd ele495
    ```
 
-2. **Create a virtual environment:**
+2. **Sanal Ortam Oluşturun ve Aktif Edin:**
    ```bash
    python3 -m venv venv
    source venv/bin/activate
    ```
 
-3. **Install dependencies:**
+3. **Gerekli Kütüphaneleri Yükleyin:**
    ```bash
    pip install -r requirements.txt
    ```
+   *(Not: `tesserocr` ve `picamera2` kurulumları sistem bağımlılıkları gerektirebilir. Detaylar için `requirements.txt` dosyasını inceleyiniz.)*
 
-## 🚀 Usage
+4. **Tesseract Dil Dosyaları:**
+   Sisteminizde `tesseract-ocr` ve `libtesseract-dev` paketlerinin kurulu olduğundan emin olun.
 
-1. **Start the application:**
-   ```bash
-   sudo ./venv/bin/python app.py
-   ```
-   *Note: `sudo` might be required for accessing serial ports and hardware interfaces.*
+## ▶️ Kullanım
 
-2. **Access the interface:**
-   Open your browser and navigate to: `http://<raspberry-pi-ip>:5000`
+Uygulamayı başlatmak için:
 
-## 📂 Project Structure
+```bash
+sudo ./venv/bin/python app.py
+```
+*(Kamera erişimi ve GPIO kontrolü için `sudo` gerekebilir, ancak modern Linux dağıtımlarında kullanıcı `gpio` ve `video` gruplarına eklenerek çözülebilir.)*
 
-- `app.py` - Main Flask application and backend logic
-- `static/` - Frontend assets (CSS, JS)
-- `templates/` - HTML templates
-- `config.json` - Machine and application configuration
-- `bases.json` - Saved coordinate database
+Tarayıcınızdan `http://<RASPBERRY_IP>:5000` adresine giderek arayüze erişebilirsiniz.
 
-## 🤝 Contributing
+### Senaryo Adımları
+- **📍 Konuma Git**: Kayıtlı bir (X, Y, Z) noktasına hareket eder.
+- **🎯 Kelimeye Merkezle**: Belirtilen metni (OCR ile) bulur ve üzerine merkezlenir.
+- **↕️ Z Konumuna Git**: Sadece Z eksenini belirtilen yüksekliğe taşır.
+- **💨/🛑 Pompa**: Vakum pompasını açar veya kapatır.
+- **⏳ Bekle**: Belirtilen süre kadar bekler.
+- **🏠 Home**: Makineyi referans noktasına (Homing) gönderir.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 📂 Proje Yapısı
 
-## 📄 License
+```
+ele495/
+├── app.py              # Ana Flask uygulaması ve Backend mantığı
+├── requirements.txt    # Python bağımlılıkları
+├── static/             # Frontend kaynakları (CSS, JS, İkonlar)
+│   ├── app.js          # İstemci tarafı mantığı
+│   └── style.css       # Arayüz stilleri
+├── templates/          # HTML şablonları
+│   └── index.html      # Ana kontrol sayfası
+├── bases.json          # Kayıtlı konumlar veritabanı
+├── scenarios.json      # Kayıtlı senaryolar veritabanı
+└── config.json         # Sistem ayarları
+```
 
-This project is proprietary software developed by **Bitirici Ekip**. All rights reserved.
+## 👥 Katkıda Bulunanlar
+
+**Bitirici Ekip** - ELE495
+- Ali Murat
+- [Diğer Ekip Üyeleri İsimleri]
+
+---
+© 2026 Tüm Hakları Saklıdır.
