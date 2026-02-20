@@ -83,8 +83,4 @@ Proje geliştirilirken temiz, hafif ve tam modüler bir asenkron altyapı hedefl
 - **Depolama Altyapısı:** Veritabanı ağırlığı yaratmamak adına `scenarios.json`, `master_scenarios.json`, `verification.json`, `config.json` şeklindeki seri çalışabilen NoSQL mantığında mini JSON datastore'lar.
 - **Frontend Framework:** Vanilla JavaScript ve asenkron Socket.IO listener arabirimi; harici hantal kütüphanelere (React veya ağır CSS kütüphaneleri) ihtiyaç bırakmayan Custom CSS ve Flexbox Grid mimarisi. Terminal fontu olarak "JetBrains Mono" entegrasyonu.
 
----
 
-## 🤝 Katkıda Bulunanlar
-
-Bu proje, **ELE495** bitirme tasarım projesi standartları bünyesinde **Şahin Yalgun** vizyonuyla, yazılım mühendisliği prensipleri ve endüstriyel mekatronik standartları gözetilerek başarıyla geliştirilmiş ve tamamlanmıştır.
