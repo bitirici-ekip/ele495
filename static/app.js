@@ -104,6 +104,127 @@ function initSocket() {
             setTimeout(hideOverlay, 3000);
         }
     });
+    socket.on('verification_update', d => {
+        if (d.status === 'running' || d.status === 'info' || d.status === 'warning') {
+            showToast('Doğrulama: ' + d.message, d.status === 'warning' ? 'warning' : 'info');
+            // Ana ekrandaki HUD'da durum göster
+            const hud = $('verificationResultsHUD');
+            if (hud) hud.innerHTML = `<div style="background:#222; border:1px solid var(--blue); border-left:4px solid var(--blue); padding:8px 14px; border-radius:4px; white-space:nowrap; display:flex; align-items:center; gap:8px; animation:pulse 1s infinite">
+                <span style="font-size:1.2rem">⏳</span>
+                <span style="font-size:0.85rem; color:#fff">${esc(d.message)}</span>
+            </div>`;
+        } else if (d.status === 'threshold_frame') {
+            // Threshold önizleme görüntüsünü göster (doğrulama sekmesinde)
+            const prev = $('vThresholdPreview');
+            if (prev && d.data && d.data.image) {
+                prev.src = 'data:image/jpeg;base64,' + d.data.image;
+            }
+        } else if (d.status === 'box_progress') {
+            // Her kutu analiz edilirken gerçek zamanlı güncelleme
+            appendBoxProgressToHUD(d.data);
+        } else if (d.status === 'error') {
+            showToast('Doğrulama: ' + d.message, 'error');
+            const hud = $('verificationResultsHUD');
+            if (hud) hud.innerHTML = `<div style="background:#222; border:1px solid var(--red); border-left:4px solid var(--red); padding:8px 14px; border-radius:4px; white-space:nowrap">
+                <span style="font-size:0.85rem; color:var(--red)">❌ ${esc(d.message)}</span>
+            </div>`;
+        } else if (d.status === 'done') {
+            showToast('Doğrulama tamamlandı!', 'success');
+            renderVerificationHUD(d.data);
+            renderVerificationResults(d.data);
+        }
+    });
+}
+
+function appendBoxProgressToHUD(boxData) {
+    const hud = $('verificationResultsHUD');
+    if (!hud) return;
+    // İlk kutu geldiğinde HUD'ı temizle (eski bekleme mesajını kaldır)
+    if (boxData.box_index === 0) hud.innerHTML = '';
+
+    const color = boxData.success ? 'var(--green)' : 'var(--red)';
+    const icon = boxData.success ? '✅' : '❌';
+    const card = document.createElement('div');
+    card.style.cssText = `background:#222; border:1px solid ${color}; border-left:4px solid ${color}; padding:6px 10px; border-radius:6px; white-space:nowrap; display:flex; align-items:center; gap:8px; min-width:140px; animation:fadeIn 0.4s ease`;
+    card.innerHTML = `
+        <img src="data:image/jpeg;base64,${boxData.roi_image}" style="width:50px; height:38px; border-radius:3px; border:1px solid #555; object-fit:cover">
+        <div style="display:flex; flex-direction:column">
+            <span style="font-size:0.7rem; color:#aaa; font-weight:bold">${esc(boxData.name)}</span>
+            <span style="font-size:0.95rem; font-weight:bold; color:${color}">${boxData.ratio}% ${icon}</span>
+            <span style="font-size:0.6rem; color:#666">hedef: ${boxData.target}%</span>
+        </div>`;
+    hud.appendChild(card);
+}
+
+function renderVerificationHUD(results) {
+    const hud = $('verificationResultsHUD');
+    if (!hud) return;
+    if (!results || !results.length) { hud.innerHTML = ''; return; }
+
+    let h = '';
+    results.forEach(r => {
+        const color = r.success ? 'var(--green)' : 'var(--red)';
+        const icon = r.success ? '✅' : '❌';
+        const roiImg = r.roi_image ? `<img src="data:image/jpeg;base64,${r.roi_image}" style="width:50px; height:38px; border-radius:3px; border:1px solid #555; object-fit:cover">` : '';
+        h += `<div style="background:#222; border:1px solid ${color}; border-left:4px solid ${color}; padding:6px 10px; border-radius:6px; white-space:nowrap; display:flex; align-items:center; gap:8px; min-width:140px">
+            ${roiImg}
+            <div style="display:flex; flex-direction:column">
+                <span style="font-size:0.7rem; color:#aaa; font-weight:bold">${esc(r.name)}</span>
+                <span style="font-size:0.95rem; font-weight:bold; color:${color}">${r.ratio}% ${icon}</span>
+                <span style="font-size:0.6rem; color:#666">hedef: ${r.target}%</span>
+            </div>
+        </div>`;
+    });
+    hud.innerHTML = h;
+}
+
+function renderVerificationResults(results) {
+    const panel = $('vResultsPanel');
+    const content = $('vResultsContent');
+    if (!panel || !content) return;
+    if (!results || !results.length) { panel.style.display = 'none'; return; }
+
+    panel.style.display = 'block';
+    const allPass = results.every(r => r.success);
+
+    // Banner'ı kameranın üstüne overlay olarak göster
+    showVerificationBanner(allPass);
+
+    // Sadece kutu detaylarını panelde göster (banner yok)
+    let h = '<div style="display:flex; flex-direction:column; gap:6px">';
+    results.forEach(r => {
+        const color = r.success ? 'var(--green)' : 'var(--red)';
+        h += `<div style="display:flex; justify-content:space-between; align-items:center; background:#111; border-left:4px solid ${color}; border-radius:4px; padding:6px 8px">
+            <div style="font-size:0.8rem; color:#aaa; display:flex; flex-direction:column">
+                <span>${esc(r.name)}</span>
+                <span style="font-size:0.6rem; color:#666">Hedef: ${r.target}%</span>
+            </div>
+            <div style="font-weight:bold; color:${color}; font-size:1rem">${r.ratio}%</div>
+        </div>`;
+    });
+    h += '</div>';
+    content.innerHTML = h;
+}
+
+function showVerificationBanner(allPass) {
+    // Kameranın üstüne overlay banner
+    const container = $('vCanvasContainer');
+    if (!container) return;
+    // Eski banner'ı kaldır
+    const old = document.getElementById('vBannerOverlay');
+    if (old) old.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'vBannerOverlay';
+    banner.style.cssText = `position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:20;
+        padding:10px 24px; border-radius:10px; font-weight:bold; font-size:1.2rem;
+        pointer-events:none; animation:fadeIn 0.5s ease;
+        background:${allPass ? 'rgba(16,185,129,0.85)' : 'rgba(239,68,68,0.85)'};
+        color:#fff; backdrop-filter:blur(4px); box-shadow:0 4px 20px rgba(0,0,0,0.5);`;
+    banner.textContent = allPass ? '\u2705 T\u00dcM KUTULAR BA\u015eARILI' : '\u274c BA\u015eARISIZ KUTULAR VAR';
+    container.appendChild(banner);
+    // 6 saniye sonra solarak kaybol
+    setTimeout(() => { if (banner.parentNode) { banner.style.transition = 'opacity 1s'; banner.style.opacity = '0'; setTimeout(() => banner.remove(), 1000); } }, 6000);
 }
 
 /* ═══ MOTOR ═══ */
@@ -234,7 +355,7 @@ async function shutdownServer() {
     showOverlay('⚠️ SUNUCU KAPATILIYOR ⚠️');
     showToast('Sunucu kapatılıyor...', 'error');
     try {
-        await api('/api/shutdown');
+        await fetch('/api/shutdown', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     } catch (e) { /* bağlantı kapandığında hata normal */ }
 }
 async function unlockGrbl() { addC('Kilit açılıyor...', 'info'); const r = await api('/api/unlock'); addC(r.message, r.success ? 'info' : 'error'); if (!r.success) showToast(r.message); }
@@ -682,6 +803,23 @@ function renderBases(list) {
         sel.innerHTML = '<option value="">Seç...</option>' + list.map(b => `<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('');
         if (cur && list.find(b => b.name === cur)) sel.value = cur;
     }
+
+    // Update Main Control Dropdown
+    const selMain = $('quickBaseSelMain');
+    if (selMain) {
+        const curMain = selMain.value;
+        selMain.innerHTML = '<option value="">Konum seç...</option>' + list.map(b => `<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('');
+        if (curMain && list.find(b => b.name === curMain)) selMain.value = curMain;
+    }
+
+    // Update Verification Dropdown
+    const vSel = $('vBaseSelect');
+    if (vSel) {
+        const vCur = vSel.value;
+        vSel.innerHTML = '<option value="">(Mevcut Konum)</option>' + list.map(b => `<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('');
+        if (vCur && list.find(b => b.name === vCur)) vSel.value = vCur;
+        else if (typeof _vConfig !== 'undefined' && _vConfig.base_name) vSel.value = _vConfig.base_name;
+    }
 }
 
 function editBase(name) {
@@ -778,6 +916,12 @@ async function gotoBaseDirect(name) {
     }
 }
 
+async function quickGotoBaseMain() {
+    const name = $('quickBaseSelMain').value;
+    if (!name) { showToast('Lütfen bir konum seçin!', 'warning'); return; }
+    gotoBaseDirect(name);
+}
+
 async function setZoom(val) {
     const v = parseFloat(val);
     $('zoomVal').textContent = 'x' + v.toFixed(1);
@@ -830,6 +974,7 @@ function renderScenarioList() {
             <td>${s.steps ? s.steps.length : 0}</td>
             <td style="text-align:right; white-space:nowrap">
                 <button class="btn-sm" style="background:#4caf50;color:#fff" onclick="editScenario('${esc(s.name)}')">✏️</button>
+                <button class="btn-sm" style="background:var(--blue);color:#fff" onclick="copyScenarioToClipboard('${esc(s.name)}')">📋 Kopyala</button>
                 <button class="btn-sm" style="background:#d32f2f;color:#fff" onclick="deleteScenario('${esc(s.name)}')">Sil</button>
                 <button class="btn-sm" style="background:#1976d2;color:#fff" onclick="runScenarioByName('${esc(s.name)}')">▶ Çalıştır</button>
             </td>
@@ -845,6 +990,54 @@ function updateScenarioDropdown() {
     const cur = sel.value;
     sel.innerHTML = '<option value="">Senaryo seç...</option>' + _scenariosList.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
     if (cur && _scenariosList.find(s => s.name === cur)) sel.value = cur;
+
+    // Also update master scenarios sub-scenario selector
+    const msel = $('masterStepSelect');
+    if (msel) {
+        const mcur = msel.value;
+        msel.innerHTML = _scenariosList.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+        if (mcur && _scenariosList.find(s => s.name === mcur)) msel.value = mcur;
+    }
+}
+
+// — Copy/Paste Scenarios —
+async function pasteScenarioFromClipboard() {
+    try {
+        const text = await navigator.clipboard.readText();
+        if (!text) { showToast('Pano boş!', 'warning'); return; }
+        let parsed = null;
+        try {
+            parsed = JSON.parse(text);
+        } catch (e) {
+            showToast('Panodaki veri geçerli JSON değil!', 'error');
+            return;
+        }
+
+        if (!parsed.name || !Array.isArray(parsed.steps)) {
+            showToast('Panodaki veri geçerli bir senaryo formatı değil!', 'error');
+            return;
+        }
+
+        $('scenarioName').value = parsed.name + ' (Kopya)';
+        _scenarioSteps = parsed.steps;
+        renderScenarioSteps();
+        showToast('Senaryo panodan yüklendi. Kaydetmeyi unutmayın!', 'info');
+    } catch (e) {
+        console.error('Panodan okuma hatası', e);
+        showToast('Panoya erişilemedi veya izin verilmedi.', 'error');
+    }
+}
+
+function copyScenarioToClipboard(name) {
+    const s = _scenariosList.find(item => item.name === name);
+    if (!s) return;
+    const data = JSON.stringify(s, null, 2);
+    navigator.clipboard.writeText(data).then(() => {
+        showToast(`'${name}' panoya kopyalandı!`, 'info');
+    }).catch(err => {
+        console.error('Kopyalama hatası', err);
+        showToast('Kopyalama başarısız.', 'error');
+    });
 }
 
 // — Step Builder —
@@ -997,6 +1190,7 @@ function stepLabel(step) {
     if (t === 'delay') return `⏳ ${step.seconds}s bekle`;
     if (t === 'move_z') return `↕️ Z: ${step.z}mm konumuna git`;
     if (t === 'home') return '🏠 Home';
+    if (t === 'verify') return '👁️ Doğruluk Kontrolü';
     return `❓ ${t}`;
 }
 
@@ -1086,6 +1280,365 @@ async function stopScenario() {
     showToast(r.message, r.success ? 'info' : 'error');
 }
 
+// — Master Scenarios —
+let _masterScenariosList = [];
+let _masterScenarioSteps = []; // currently building list of scenario names
+
+async function loadMasterScenarios() {
+    try {
+        const r = await fetch('/api/master_scenarios').then(res => res.json());
+        if (r.success) {
+            _masterScenariosList = r.master_scenarios || [];
+            renderMasterScenarioList();
+            updateMasterScenarioDropdown();
+        }
+    } catch (e) { console.error('Master Scenarios load error', e); }
+}
+
+function renderMasterScenarioList() {
+    const cont = $('masterScenarioList');
+    if (!cont) return;
+    if (!_masterScenariosList.length) {
+        cont.innerHTML = '<div class="ocr-empty">Kayıtlı master senaryo yok.</div>';
+        return;
+    }
+    let h = '<table style="width:100%; border-collapse:collapse; font-size:0.9rem">';
+    h += '<tr style="border-bottom:1px solid #444; text-align:left; color:#aaa"><th style="padding:4px">İsim</th><th>Sıralama</th><th></th></tr>';
+    _masterScenariosList.forEach(ms => {
+        const seqStr = ms.sequence ? ms.sequence.join(', ') : '';
+        h += `<tr style="border-bottom:1px solid #333">
+            <td style="padding:8px">${esc(ms.name)}</td>
+            <td style="max-width:150px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap" title="${esc(seqStr)}">${esc(seqStr)}</td>
+            <td style="text-align:right; white-space:nowrap">
+                <button class="btn-sm" style="background:#4caf50;color:#fff" onclick="editMasterScenario('${esc(ms.name)}')">✏️</button>
+                <button class="btn-sm" style="background:#d32f2f;color:#fff" onclick="deleteMasterScenario('${esc(ms.name)}')">Sil</button>
+                <button class="btn-sm" style="background:var(--yellow);color:#000" onclick="runMasterScenarioByName('${esc(ms.name)}')">▶ P. Başlat</button>
+            </td>
+         </tr>`;
+    });
+    h += '</table>';
+    cont.innerHTML = h;
+}
+
+function updateMasterScenarioDropdown() {
+    const sel = $('quickMasterScenarioSel');
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">👑 Master Senaryo seç...</option>' + _masterScenariosList.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+    if (cur && _masterScenariosList.find(s => s.name === cur)) sel.value = cur;
+}
+
+function addMasterScenarioStep() {
+    const sel = $('masterStepSelect');
+    if (!sel || !sel.value) { showToast('Eklenecek senaryoyu seçin!', 'warning'); return; }
+    _masterScenarioSteps.push(sel.value);
+    renderMasterScenarioSteps();
+}
+
+function removeMasterScenarioStep(idx) {
+    _masterScenarioSteps.splice(idx, 1);
+    renderMasterScenarioSteps();
+}
+
+function moveMasterScenarioStep(idx, dir) {
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= _masterScenarioSteps.length) return;
+    const tmp = _masterScenarioSteps[idx];
+    _masterScenarioSteps[idx] = _masterScenarioSteps[newIdx];
+    _masterScenarioSteps[newIdx] = tmp;
+    renderMasterScenarioSteps();
+}
+
+function clearMasterScenarioSteps() {
+    _masterScenarioSteps = [];
+    $('masterScenarioName').value = '';
+    renderMasterScenarioSteps();
+}
+
+function renderMasterScenarioSteps() {
+    const cont = $('masterScenarioStepList');
+    if (!cont) return;
+    if (!_masterScenarioSteps.length) {
+        cont.innerHTML = '<div class="ocr-empty">Henüz senaryo eklenmedi.</div>';
+        return;
+    }
+    let h = '';
+    _masterScenarioSteps.forEach((sName, i) => {
+        h += `<div style="display:flex; align-items:center; gap:6px; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.85rem">
+            <span style="color:#666; font-weight:600; min-width:24px">${i + 1}.</span>
+            <span style="flex:1">🎬 ${esc(sName)}</span>
+            <button class="btn-sm" onclick="moveMasterScenarioStep(${i},-1)" style="padding:2px 6px; font-size:0.7rem" title="Yukarı">▲</button>
+            <button class="btn-sm" onclick="moveMasterScenarioStep(${i},1)" style="padding:2px 6px; font-size:0.7rem" title="Aşağı">▼</button>
+            <button class="btn-sm" style="background:#d32f2f;color:#fff; padding:2px 6px; font-size:0.7rem" onclick="removeMasterScenarioStep(${i})">✗</button>
+        </div>`;
+    });
+    cont.innerHTML = h;
+}
+
+async function saveMasterScenario() {
+    const name = $('masterScenarioName').value.trim();
+    if (!name) { showToast('Master Senaryo adı gerekli!', 'error'); return; }
+    if (!_masterScenarioSteps.length) { showToast('En az bir senaryo ekleyin!', 'error'); return; }
+
+    const r = await api('/api/master_scenarios', { name, sequence: _masterScenarioSteps });
+    if (r.success) {
+        showToast('Master Senaryo kaydedildi.', 'info');
+        _masterScenariosList = r.master_scenarios;
+        renderMasterScenarioList();
+        updateMasterScenarioDropdown();
+        clearMasterScenarioSteps();
+    } else {
+        showToast('Hata: ' + r.message, 'error');
+    }
+}
+
+function editMasterScenario(name) {
+    const ms = _masterScenariosList.find(item => item.name === name);
+    if (!ms) return;
+    $('masterScenarioName').value = ms.name;
+    _masterScenarioSteps = [...(ms.sequence || [])];
+    renderMasterScenarioSteps();
+    switchTab('scenarios');
+    showToast(`'${name}' (Master) düzenleme modunda.`, 'info');
+}
+
+async function deleteMasterScenario(name) {
+    if (!confirm(name + ' silinsin mi?')) return;
+    const r = await fetch('/api/master_scenarios/' + encodeURIComponent(name), { method: 'DELETE' }).then(res => res.json());
+    if (r.success) {
+        showToast('Master Senaryo silindi.', 'info');
+        _masterScenariosList = r.master_scenarios;
+        renderMasterScenarioList();
+        updateMasterScenarioDropdown();
+    } else {
+        showToast('Hata: ' + r.message, 'error');
+    }
+}
+
+async function runMasterScenarioByName(name) {
+    const r = await api('/api/master_scenario/run', { name });
+    if (r.success) {
+        showToast(r.message, 'info');
+    } else {
+        showToast(r.message, 'error');
+    }
+}
+
+// — Verification (Doğrulama) —
+let _vConfig = { base_name: '', threshold: 127, boxes: [] };
+
+async function loadVerification() {
+    try {
+        const r = await fetch('/api/verification/settings').then(res => res.json());
+        if (r.success) {
+            _vConfig = r.verification;
+            if (!_vConfig.boxes) _vConfig.boxes = [];
+
+            const eTh = $('vThreshold');
+            if (eTh) {
+                eTh.value = _vConfig.threshold || 127;
+                const lbl = $('vThVal');
+                if (lbl) lbl.textContent = eTh.value;
+            }
+
+            renderVerificationBoxes();
+            renderBoxOverlay();
+
+            if (_basesList && _basesList.length > 0) {
+                renderBases(_basesList);
+            }
+        }
+    } catch (e) { console.error('Verification load error', e); }
+}
+
+function renderVerificationBoxes() {
+    const cont = $('vBoxEditorList');
+    if (!cont) return;
+    if (!_vConfig.boxes.length) {
+        cont.innerHTML = '<div class="ocr-empty" style="font-size:0.8rem">Henüz kutu eklenmedi.</div>';
+        return;
+    }
+
+    let h = '';
+    _vConfig.boxes.forEach((b, i) => {
+        h += `<div style="background:#222; padding:8px; border-radius:4px; border:1px solid #333; display:flex; flex-direction:column; gap:6px">
+            <div style="display:flex; justify-content:space-between; align-items:center">
+                <input type="text" class="cfg-in" style="width:120px; padding:2px 4px" value="${esc(b.name)}" oninput="updateVBox(${i}, 'name', this.value)">
+                <button class="btn-sm" style="background:#d32f2f; color:#fff" onclick="removeVBox(${i})">Sil</button>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; font-size:0.8rem; color:#aaa">
+                Hedef Doluluk (%): 
+                <input type="number" class="cfg-in" style="width:60px; padding:2px 4px" value="${b.target_ratio}" step="0.5" oninput="updateVBox(${i}, 'target_ratio', parseFloat(this.value)||0)">
+            </div>
+        </div>`;
+    });
+    cont.innerHTML = h;
+}
+
+function updateVBox(idx, key, val) {
+    if (_vConfig.boxes[idx]) {
+        _vConfig.boxes[idx][key] = val;
+    }
+}
+
+function removeVBox(idx) {
+    _vConfig.boxes.splice(idx, 1);
+    renderVerificationBoxes();
+    renderBoxOverlay();
+}
+
+function addNewVerificationBox() {
+    const newId = 'box_' + Date.now();
+    _vConfig.boxes.push({
+        id: newId,
+        name: 'Yeni Kutu ' + (_vConfig.boxes.length + 1),
+        x: 0.4, y: 0.4, w: 0.2, h: 0.2, // percentages (0 -> 1)
+        target_ratio: 10.0
+    });
+    renderVerificationBoxes();
+    renderBoxOverlay();
+}
+
+async function saveVerificationSettings() {
+    _vConfig.base_name = $('vBaseSelect').value;
+    _vConfig.threshold = parseInt($('vThreshold').value) || 127;
+
+    const r = await api('/api/verification/settings', _vConfig, 'POST');
+    if (r.success) {
+        showToast('Doğrulama ayarları kaydedildi.', 'info');
+    } else {
+        showToast('Hata: ' + r.message, 'error');
+    }
+}
+
+async function testVerification() {
+    saveVerificationSettings().then(async () => {
+        const r = await fetch('/api/verification/run', { method: 'POST' }).then(res => res.json());
+        if (r.success) {
+            showToast('Doğrulama testi başlatıldı...', 'info');
+            switchTab('control'); // Odaklanmak ve HUD'ı görmek için
+        } else {
+            showToast('Hata: ' + r.message, 'error');
+        }
+    });
+}
+
+// GUI Drawing and dragging over #vBoxOverlay
+let _vDrag = null; // { type, idx, startX, startY, origX, origY, origW, origH }
+
+/** Kameranın container içinde gerçekte kapladığı alanı hesapla (object-fit:contain) */
+function getRenderedImageRect() {
+    const img = $('vMainCam');
+    const container = $('vCanvasContainer');
+    if (!img || !container) return null;
+    const cRect = container.getBoundingClientRect();
+    const natW = img.naturalWidth || 640;
+    const natH = img.naturalHeight || 480;
+    const scale = Math.min(cRect.width / natW, cRect.height / natH);
+    const rw = natW * scale;
+    const rh = natH * scale;
+    const rx = (cRect.width - rw) / 2;
+    const ry = (cRect.height - rh) / 2;
+    return { x: rx, y: ry, w: rw, h: rh };
+}
+
+function syncOverlayToImage() {
+    const ov = $('vBoxOverlay');
+    const r = getRenderedImageRect();
+    if (!ov || !r) return;
+    ov.style.left = r.x + 'px';
+    ov.style.top = r.y + 'px';
+    ov.style.width = r.w + 'px';
+    ov.style.height = r.h + 'px';
+}
+
+// Sürekli RAF döngüsü ile overlay'ı her zaman kamera ile senkron tut
+(function _vSyncLoop() {
+    syncOverlayToImage();
+    requestAnimationFrame(_vSyncLoop);
+})();
+
+function renderBoxOverlay() {
+    const ov = $('vBoxOverlay');
+    if (!ov) return;
+    syncOverlayToImage();
+    ov.innerHTML = '';
+
+    _vConfig.boxes.forEach((b, i) => {
+        const div = document.createElement('div');
+        div.style.position = 'absolute';
+        div.style.left = (b.x * 100) + '%';
+        div.style.top = (b.y * 100) + '%';
+        div.style.width = (b.w * 100) + '%';
+        div.style.height = (b.h * 100) + '%';
+        div.style.border = '2px solid var(--orange)';
+        div.style.backgroundColor = 'rgba(245, 158, 11, 0.1)';
+        div.style.pointerEvents = 'auto';
+        div.style.cursor = 'move';
+        div.style.boxSizing = 'border-box';
+
+        // Label
+        const lbl = document.createElement('div');
+        lbl.textContent = b.name;
+        lbl.style.cssText = 'position:absolute;top:-18px;left:-2px;background:var(--orange);color:#000;font-size:0.65rem;padding:1px 4px;font-weight:bold;white-space:nowrap';
+        div.appendChild(lbl);
+
+        // Resize handle
+        const handle = document.createElement('div');
+        handle.style.cssText = 'position:absolute;right:-4px;bottom:-4px;width:10px;height:10px;background:#fff;border:1px solid #000;cursor:se-resize';
+        handle.onmousedown = (e) => { e.preventDefault(); e.stopPropagation(); startVDrop(e, i, 'resize'); };
+        div.appendChild(handle);
+
+        div.onmousedown = (e) => { e.preventDefault(); e.stopPropagation(); startVDrop(e, i, 'move'); };
+        ov.appendChild(div);
+    });
+}
+
+function startVDrop(e, idx, type) {
+    const b = _vConfig.boxes[idx];
+    _vDrag = {
+        type, idx,
+        startX: e.clientX, startY: e.clientY,
+        origX: b.x, origY: b.y, origW: b.w, origH: b.h
+    };
+    document.addEventListener('mousemove', onVMouseMove);
+    document.addEventListener('mouseup', onVMouseUp);
+}
+
+function onVMouseMove(e) {
+    if (!_vDrag) return;
+    const ov = $('vBoxOverlay');
+    const rect = ov.getBoundingClientRect();
+    const dx = (e.clientX - _vDrag.startX) / rect.width;
+    const dy = (e.clientY - _vDrag.startY) / rect.height;
+    const b = _vConfig.boxes[_vDrag.idx];
+    if (_vDrag.type === 'move') {
+        b.x = Math.max(0, Math.min(1 - b.w, _vDrag.origX + dx));
+        b.y = Math.max(0, Math.min(1 - b.h, _vDrag.origY + dy));
+    } else if (_vDrag.type === 'resize') {
+        b.w = Math.max(0.02, Math.min(1 - b.x, _vDrag.origW + dx));
+        b.h = Math.max(0.02, Math.min(1 - b.y, _vDrag.origH + dy));
+    }
+    renderBoxOverlay();
+}
+
+function onVMouseUp() {
+    if (_vDrag) {
+        document.removeEventListener('mousemove', onVMouseMove);
+        document.removeEventListener('mouseup', onVMouseUp);
+        _vDrag = null;
+    }
+}
+
+function quickRunMasterScenario() {
+    const name = $('quickMasterScenarioSel').value;
+    if (!name) { showToast('Master Senaryo seçin!', 'error'); return; }
+    runMasterScenarioByName(name);
+}
+
 // — Init —
 loadScenarios();
+loadMasterScenarios();
+loadVerification();
 onStepTypeChange(); // init param box
+

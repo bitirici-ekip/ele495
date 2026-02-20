@@ -30,7 +30,15 @@
         "type": "pump_on"
       },
       {
-        "seconds": 5,
+        "type": "delay",
+        "seconds": 5
+      },
+      {
+        "type": "move_z",
+        "z": 0
+      },
+      {
+        "seconds": 20,
         "type": "delay"
       },
       {
@@ -51,6 +59,80 @@
       },
       {
         "type": "pump_off"
+      },
+      {
+        "seconds": 5,
+        "type": "delay"
+      },
+      {
+        "type": "move_z",
+        "z": 0
+      },
+      {
+        "seconds": 20,
+        "type": "delay"
+      },
+      {
+        "base_name": "PCB BASE",
+        "type": "goto_base"
+      },
+      {
+        "seconds": 10,
+        "type": "delay"
+      },
+      {
+        "type": "verify"
+      },
+      {
+        "type": "home"
+      }
+    ]
+  },
+  {
+    "name": "MUS to D1",
+    "steps": [
+      {
+        "type": "goto_base",
+        "base_name": "KOMPONENT BASE"
+      },
+      {
+        "type": "delay",
+        "seconds": 5
+      },
+      {
+        "type": "move_z",
+        "z": -163
+      },
+      {
+        "type": "delay",
+        "seconds": 5
+      },
+      {
+        "type": "goto_base",
+        "base_name": "PCB BASE"
+      },
+      {
+        "type": "delay",
+        "seconds": 5
+      },
+      {
+        "type": "goto_base",
+        "base_name": "D1 PCB"
+      },
+      {
+        "type": "pump_off"
+      },
+      {
+        "type": "delay",
+        "seconds": 5
+      },
+      {
+        "type": "move_z",
+        "z": 160
+      },
+      {
+        "type": "delay",
+        "seconds": 10
       },
       {
         "type": "home"

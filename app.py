@@ -28,6 +28,7 @@ import sys
 import time
 import json
 import glob
+import base64
 import threading
 import logging
 import functools
@@ -63,6 +64,7 @@ logging.basicConfig(
     datefmt="%H:%M:%S"
 )
 log = logging.getLogger("PNP")
+logging.getLogger("werkzeug").setLevel(logging.WARNING)  # HTTP istek spam'ini engelle
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  YAPILANDIRMA (Konfigürasyon)
@@ -150,8 +152,16 @@ class Config:
     CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.json')
     BASES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bases.json')
     SCENARIOS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scenarios.json')
+    MASTER_SCENARIOS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'master_scenarios.json')
+    VERIFICATION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'verification.json')
     BASES = []
     SCENARIOS = []
+    MASTER_SCENARIOS = []
+    VERIFICATION = {
+        'boxes': [],
+        'base_name': '',
+        'threshold': 127
+    }
 
     def to_dict(self):
         """JSON olarak döndür."""
@@ -323,11 +333,77 @@ class Config:
         except Exception as e:
             log.error(f"Senaryo kayıt hatası: {e}")
 
+    def load_master_scenarios(self):
+        """Master Senaryoları dosyadan yükle."""
+        try:
+            if os.path.exists(self.MASTER_SCENARIOS_FILE):
+                with open(self.MASTER_SCENARIOS_FILE, 'r') as f:
+                    content = f.read().strip()
+                if content:
+                    try:
+                        self.MASTER_SCENARIOS = json.loads(content)
+                        log.info(f"{len(self.MASTER_SCENARIOS)} adet master senaryo yüklendi.")
+                    except json.JSONDecodeError:
+                        log.error("Master Scenarios JSON hatası!")
+                        self.MASTER_SCENARIOS = []
+                else:
+                    self.MASTER_SCENARIOS = []
+            else:
+                self.MASTER_SCENARIOS = []
+        except Exception as e:
+            log.error(f"Master Senaryo yükleme hatası: {e}")
+            self.MASTER_SCENARIOS = []
+
+    def save_master_scenarios(self):
+        """Master Senaryoları güvenli kaydet."""
+        try:
+            temp_file = self.MASTER_SCENARIOS_FILE + ".tmp"
+            with open(temp_file, 'w') as f:
+                json.dump(self.MASTER_SCENARIOS, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_file, self.MASTER_SCENARIOS_FILE)
+            log.info(f"Master Senaryolar kaydedildi: {len(self.MASTER_SCENARIOS)} adet")
+        except Exception as e:
+            log.error(f"Master Senaryo kayıt hatası: {e}")
+
+    def load_verification(self):
+        """Doğrulama (Verification) ayarlarını yükle."""
+        try:
+            if os.path.exists(self.VERIFICATION_FILE):
+                with open(self.VERIFICATION_FILE, 'r') as f:
+                    content = f.read().strip()
+                if content:
+                    try:
+                        data = json.loads(content)
+                        self.VERIFICATION.update(data)
+                        log.info(f"Doğrulama ayarları yüklendi. ({len(self.VERIFICATION.get('boxes', []))} kutu)")
+                    except json.JSONDecodeError:
+                        log.error("Verification JSON hatası!")
+        except Exception as e:
+            log.error(f"Verification yükleme hatası: {e}")
+
+    def save_verification(self):
+        """Doğrulama ayarlarını kaydet."""
+        try:
+            temp_file = self.VERIFICATION_FILE + ".tmp"
+            with open(temp_file, 'w') as f:
+                json.dump(self.VERIFICATION, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_file, self.VERIFICATION_FILE)
+            log.info("Doğrulama ayarları kaydedildi.")
+        except Exception as e:
+            log.error(f"Verification kayıt hatası: {e}")
+
+
 # Global config nesnesi
 config = Config()
 config.load_config()
 config.load_bases()
 config.load_scenarios()
+config.load_master_scenarios()
+config.load_verification()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -714,6 +790,7 @@ class CameraManager:
         self.current_gray = None          # Gri tonlamalı (display için)
         self.current_thresh = None        # Threshold (OCR için)
         self.annotated_frame = None       # Kutu + çizgi çizilmiş frame (stream için)
+        self.raw_display_frame = None     # Temiz frame (doğrulama tab için)
         self.frame_lock = threading.Lock()
 
         # OCR sonuçları
@@ -1062,6 +1139,10 @@ class CameraManager:
 
             img_h, img_w = display.shape[:2]
 
+            # Temiz frame'i kaydet (doğrulama tabı için — annotasyonsuz)
+            with self.frame_lock:
+                self.raw_display_frame = display.copy()
+
             # ─── Annotasyonlar (kutu, çapraz çizgi, merkez) ─────────────
             with self.ocr_lock:
                 results_copy = list(self.ocr_results)
@@ -1221,6 +1302,16 @@ class CameraManager:
             if self.annotated_frame is None:
                 return None
             _, jpeg = cv2.imencode('.jpg', self.annotated_frame, [
+                cv2.IMWRITE_JPEG_QUALITY, 80
+            ])
+            return jpeg.tobytes()
+
+    def get_raw_mjpeg_frame(self):
+        """Temiz (annotasyonsuz) frame'i JPEG olarak döndür."""
+        with self.frame_lock:
+            if self.raw_display_frame is None:
+                return None
+            _, jpeg = cv2.imencode('.jpg', self.raw_display_frame, [
                 cv2.IMWRITE_JPEG_QUALITY, 80
             ])
             return jpeg.tobytes()
@@ -1482,6 +1573,145 @@ def auto_center(camera: CameraManager, pnp: PNPDriver, socketio: SocketIO, targe
         camera.auto_centering = False
 
 # ═════════════════════════════════════════════════════════════════════════════
+#  GÖRÜNTÜ İŞLEME İLE DOĞRULUK KONTROLÜ (VERIFICATION)
+# ═════════════════════════════════════════════════════════════════════════════
+verification_running = False
+
+def run_verification(camera_ref, pnp_ref, socketio_ref):
+    """
+    Belirtilen konuma gidip kamera üzerinden Binary Threshold ile 
+    tanımlı ROI kutularındaki siyah piksel doluluk oranını hesaplar.
+    Her kutu için threshold görüntüsünü base64 olarak frontend'e gönderir.
+    """
+    global verification_running
+    verification_running = True
+    results = []
+
+    def emit(status, message, data=None):
+        payload = {'status': status, 'message': message}
+        if data is not None:
+            payload['data'] = data
+        socketio_ref.emit('verification_update', payload)
+        log.info(f"Verification: {message}")
+
+    try:
+        emit('running', "Doğrulama başlatılıyor...")
+
+        v_config = config.VERIFICATION
+        base_name = v_config.get('base_name', '')
+        boxes = v_config.get('boxes', [])
+        threshold_val = int(v_config.get('threshold', 127))
+
+        if not boxes:
+            emit('error', "Doğrulama için tanımlı kutu bulunamadı!")
+            return
+
+        # 1. Kayıtlı konuma git
+        if base_name:
+            target = next((b for b in config.BASES if b['name'] == base_name), None)
+            if target:
+                emit('running', f"'{base_name}' konumuna gidiliyor...")
+                current_z = pnp_ref.current_z
+                target_z = target['z']
+                if target_z < current_z:
+                    pnp_ref.move_absolute(x=target['x'], y=target['y'])
+                    pnp_ref.move_absolute(z=target_z)
+                else:
+                    pnp_ref.move_absolute(z=target_z)
+                    pnp_ref.move_absolute(x=target['x'], y=target['y'])
+                time.sleep(1.0)
+            else:
+                emit('warning', f"Doğrulama konumu '{base_name}' bulunamadı. Mevcut konumda devam ediliyor.")
+        else:
+            emit('info', "Doğrulama konumu seçilmemiş. Mevcut konumda devam ediliyor.")
+
+        emit('running', "Görüntü stabilize ediliyor...")
+        time.sleep(1.0)
+
+        for _ in range(5):
+            time.sleep(0.1)
+
+        with camera_ref.frame_lock:
+            if camera_ref.current_gray is None:
+                emit('error', "Kameradan görüntü alınamıyor!")
+                return
+            frame_gray = camera_ref.current_gray.copy()
+
+        # 2. Binary Threshold uygula
+        blurred = cv2.GaussianBlur(frame_gray, (5, 5), 0)
+        _, thresh = cv2.threshold(blurred, threshold_val, 255, cv2.THRESH_BINARY)
+
+        # Tam kare threshold görüntüsünü küçültüp base64 olarak gönder
+        h_full, w_full = thresh.shape[:2]
+        scale = min(400 / w_full, 300 / h_full)
+        small_thresh = cv2.resize(thresh, (int(w_full * scale), int(h_full * scale)))
+        _, buf_full = cv2.imencode('.jpg', small_thresh, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        full_b64 = base64.b64encode(buf_full).decode('utf-8')
+        emit('threshold_frame', "Threshold görüntüsü hazır.", data={'image': full_b64})
+
+        # 3. ROI'leri analiz et
+        img_h, img_w = thresh.shape[:2]
+
+        for i, box in enumerate(boxes):
+            bx = int(box.get('x', 0) * img_w)
+            by = int(box.get('y', 0) * img_h)
+            bw = int(box.get('w', 0.1) * img_w)
+            bh = int(box.get('h', 0.1) * img_h)
+            name = box.get('name', 'Bilinmeyen')
+            target_ratio = float(box.get('target_ratio', 10.0))
+
+            x1 = max(0, bx)
+            y1 = max(0, by)
+            x2 = min(img_w, bx + bw)
+            y2 = min(img_h, by + bh)
+
+            if x2 <= x1 or y2 <= y1:
+                results.append({'id': box.get('id'), 'name': name, 'ratio': 0.0, 'success': False, 'target': target_ratio, 'roi_image': ''})
+                continue
+
+            roi_thresh = thresh[y1:y2, x1:x2]
+
+            # Siyah piksel oranı (threshold sonrası siyah = 0 olan pikseller)
+            total_pixels = roi_thresh.size
+            black_pixels = total_pixels - cv2.countNonZero(roi_thresh)
+
+            if total_pixels > 0:
+                fill_ratio = (black_pixels / total_pixels) * 100.0
+            else:
+                fill_ratio = 0.0
+
+            success = fill_ratio >= target_ratio
+
+            # ROI threshold görüntüsünü base64 olarak gönder
+            roi_resized = cv2.resize(roi_thresh, (120, 90))
+            _, buf_roi = cv2.imencode('.jpg', roi_resized, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            roi_b64 = base64.b64encode(buf_roi).decode('utf-8')
+
+            emit('box_progress', f"Kutu {i+1}/{len(boxes)}: {name} → %{fill_ratio:.1f}", data={
+                'box_index': i, 'name': name, 'ratio': round(fill_ratio, 2),
+                'success': success, 'target': target_ratio, 'roi_image': roi_b64
+            })
+            time.sleep(0.3)  # Her kutu arası kısa bekleme (animasyon efekti)
+
+            results.append({
+                'id': box.get('id'),
+                'name': name,
+                'ratio': round(fill_ratio, 2),
+                'success': success,
+                'target': target_ratio,
+                'roi_image': roi_b64
+            })
+
+        emit('done', "Doğrulama tamamlandı.", data=results)
+
+    except Exception as e:
+        emit('error', f"Doğrulama hatası: {e}")
+        log.error(f"Doğrulama işlemi iptal edildi: {e}")
+
+    finally:
+        verification_running = False
+
+# ═════════════════════════════════════════════════════════════════════════════
 #  FLASK WEB SUNUCUSU
 # ═════════════════════════════════════════════════════════════════════════════
 
@@ -1576,6 +1806,29 @@ def video_feed():
     """Canlı kamera görüntüsü MJPEG stream endpoint'i."""
     return Response(
         generate_mjpeg(),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
+
+
+def generate_mjpeg_raw():
+    """Temiz (annotasyonsuz) MJPEG stream generator."""
+    while True:
+        frame = camera.get_raw_mjpeg_frame()
+        if frame is not None:
+            yield (
+                b'--frame\r\n'
+                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n'
+            )
+        else:
+            time.sleep(0.05)
+
+
+@app.route('/video_feed_raw')
+@login_required
+def video_feed_raw():
+    """Temiz kamera görüntüsü (crosshair/PIP/OCR yok) — doğrulama tab için."""
+    return Response(
+        generate_mjpeg_raw(),
         mimetype='multipart/x-mixed-replace; boundary=frame'
     )
 
@@ -1890,6 +2143,20 @@ def run_scenario(scenario, pnp_ref, camera_ref, socketio_ref):
                 pnp_ref.move_absolute(z=z_val)
                 socketio_ref.emit('motor_update', pnp_ref.get_status())
 
+            elif stype == 'verify':
+                emit('running', "👁️ Doğruluk Kontrolü yapılıyor...", i)
+                if verification_running:
+                    emit('warning', "Doğrulama zaten devam ediyor, atlandı.", i)
+                else:
+                    run_verification(camera_ref, pnp_ref, socketio_ref)
+                    # wait for verification to finish
+                    while verification_running and not scenario_stop_flag:
+                        time.sleep(0.5)
+                        
+                    if scenario_stop_flag:
+                        emit('stopped', "Senaryo durduruldu (doğrulama sırasında).")
+                        return
+
             else:
                 emit('warning', f"Bilinmeyen komut tipi: {stype}", i)
 
@@ -1915,6 +2182,7 @@ def _step_description(step):
     if t == 'delay': return f"⏳ {step.get('seconds', 1)}s bekle"
     if t == 'move_z': return f"↕️ Z: {step.get('z', 0)}mm konumuna git"
     if t == 'home': return "🏠 Home pozisyonuna git"
+    if t == 'verify': return "👁️ Doğruluk Kontrolü yap"
     return f"❓ {t}"
 
 
@@ -1979,6 +2247,81 @@ def api_run_scenario():
     return jsonify({'success': True, 'message': f"Senaryo '{name}' başlatıldı"})
 
 
+@app.route('/api/master_scenarios', methods=['GET', 'POST'])
+def api_master_scenarios():
+    """Master Senaryoları listele veya yeni ekle/güncelle."""
+    if request.method == 'POST':
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': True, 'master_scenarios': config.MASTER_SCENARIOS})
+        name = data.get('name')
+        if not name:
+            return jsonify({'success': False, 'message': 'Master Senaryo adı gerekli'})
+        
+        # 'sequence' is a list of scenario names
+        sequence = data.get('sequence', [])
+        entry = {'name': name, 'sequence': sequence}
+
+        exists = False
+        for i, ms in enumerate(config.MASTER_SCENARIOS):
+            if ms['name'] == name:
+                config.MASTER_SCENARIOS[i] = entry
+                exists = True
+                break
+        if not exists:
+            config.MASTER_SCENARIOS.append(entry)
+
+        config.save_master_scenarios()
+        return jsonify({'success': True, 'message': 'Master Senaryo kaydedildi', 'master_scenarios': config.MASTER_SCENARIOS})
+
+    return jsonify({'success': True, 'master_scenarios': config.MASTER_SCENARIOS})
+
+@app.route('/api/master_scenarios/<name>', methods=['DELETE'])
+def api_delete_master_scenario(name):
+    """Master Senaryoyu sil."""
+    original_len = len(config.MASTER_SCENARIOS)
+    config.MASTER_SCENARIOS = [ms for ms in config.MASTER_SCENARIOS if ms['name'] != name]
+    if len(config.MASTER_SCENARIOS) < original_len:
+        config.save_master_scenarios()
+        return jsonify({'success': True, 'message': 'Master Senaryo silindi', 'master_scenarios': config.MASTER_SCENARIOS})
+    return jsonify({'success': False, 'message': 'Master Senaryo bulunamadı'})
+
+@app.route('/api/master_scenario/run', methods=['POST'])
+def api_run_master_scenario():
+    """Master senaryoyu (alt senaryoların birleşimi) çalıştır."""
+    global scenario_running
+    if scenario_running:
+        return jsonify({'success': False, 'message': 'Bir senaryo zaten çalışıyor!'})
+
+    data = request.get_json()
+    name = data.get('name')
+    
+    ms = next((m for m in config.MASTER_SCENARIOS if m['name'] == name), None)
+    if not ms:
+        return jsonify({'success': False, 'message': 'Master Senaryo bulunamadı'})
+        
+    # Virtual scenario composed of sub-scenario steps
+    virtual_steps = []
+    for s_name in ms.get('sequence', []):
+        sub = next((s for s in config.SCENARIOS if s['name'] == s_name), None)
+        if sub:
+            virtual_steps.extend(sub.get('steps', []))
+        else:
+            log.warning(f"Master Senaryo '{name}' içinde alt senaryo bulunamadı: '{s_name}'")
+            
+    virtual_scenario = {
+        'name': f"[M] {name}",
+        'steps': virtual_steps
+    }
+
+    threading.Thread(
+        target=run_scenario,
+        args=(virtual_scenario, pnp, camera, socketio),
+        daemon=True
+    ).start()
+    return jsonify({'success': True, 'message': f"Master Senaryo '{name}' başlatıldı"})
+
+
 @app.route('/api/scenario/stop', methods=['POST'])
 def api_scenario_stop():
     """Çalışan senaryoyu durdur."""
@@ -1989,8 +2332,37 @@ def api_scenario_stop():
     return jsonify({'success': True, 'message': 'Durdurma sinyali gönderildi'})
 
 
+@app.route('/api/verification/settings', methods=['GET', 'POST'])
+def api_verification_settings():
+    """Doğrulama ayarlarını getir veya güncelle."""
+    if request.method == 'POST':
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Boş data'})
+            
+        config.VERIFICATION.update(data)
+        config.save_verification()
+        return jsonify({'success': True, 'message': 'Doğrulama ayarları kaydedildi', 'verification': config.VERIFICATION})
+
+    return jsonify({'success': True, 'verification': config.VERIFICATION})
+
+
+@app.route('/api/verification/run', methods=['POST'])
+def api_verification_run():
+    """Doğrulama işlemini manuel tetikle."""
+    global verification_running
+    if verification_running:
+        return jsonify({'success': False, 'message': 'Doğrulama zaten çalışıyor!'})
+
+    threading.Thread(
+        target=run_verification,
+        args=(camera, pnp, socketio),
+        daemon=True
+    ).start()
+    return jsonify({'success': True, 'message': 'Doğrulama başlatıldı'})
+
+
 @app.route('/api/config', methods=['POST'])
-@login_required
 def api_set_config():
     """Konfigürasyonu güncelle. JSON body: {key: value, ...}"""
     data = request.get_json()
