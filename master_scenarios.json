@@ -1,9 +1,11 @@
 [
   {
-    "name": "2 kere ayd",
+    "name": "ANA İŞLEV",
     "sequence": [
+      "CRB to R1",
+      "SHN to R2",
       "AYD to D2",
-      "AYD to D2"
+      "MUS to D1"
     ]
   }
 ]

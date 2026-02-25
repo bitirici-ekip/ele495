@@ -136,6 +136,49 @@ class Config:
     # Açılışta Otomatik Home
     AUTO_HOME = True
 
+    # ── Nozzle Controller Ayarları ──────────────────────────────────────
+    NOZZLE_SERIAL_PORT = '/dev/arduino_slave'
+    NOZZLE_SERIAL_BAUD = 115200
+    NOZZLE_SERIAL_TIMEOUT = 15
+
+    # CNC Shield Pin Tanımları
+    NOZZLE_STEP_PIN = 2
+    NOZZLE_DIR_PIN = 5
+    NOZZLE_EN_PIN = 8
+    NOZZLE_LIMIT_PIN = 9
+
+    # Motor Parametreleri
+    NOZZLE_STEPS_PER_REV_BASE = 200
+    NOZZLE_MICROSTEPPING = 16
+
+    # Hareket Sınırları
+    NOZZLE_MIN_ANGLE = -180.0
+    NOZZLE_MAX_ANGLE = 180.0
+
+    # Hız Parametreleri (µs/adım)
+    NOZZLE_NORMAL_SPEED_US = 400
+    NOZZLE_HOMING_SPEED_US = 2000
+    NOZZLE_ACCEL_STEPS = 200
+    NOZZLE_ACCEL_START_US = 2000
+
+    # Nozzle Homing
+    NOZZLE_HOMING_DIR = 1
+    NOZZLE_HOMING_BACK_DIR = 0
+
+    # Direnç Ölçümü (Voltage Divider)
+    NOZZLE_ANALOG_PIN = 1
+    NOZZLE_KNOWN_RESISTANCE = 10000
+    NOZZLE_ADC_SAMPLE_COUNT = 20
+
+    # Diyot Testi
+    NOZZLE_DIODE_THRESHOLD = 500
+
+    # Test Parametreleri
+    NOZZLE_TEST_COUNT = 10
+    NOZZLE_TEST_INTERVAL = 1.0
+
+    NOZZLE_CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'nozzle_config.json')
+
 
     # Motor hareket yönü ters çevirme (eski, geriye uyumluluk)
     INVERT_X = True
@@ -198,6 +241,30 @@ class Config:
             "ocr_min_word_length": self.OCR_MIN_WORD_LENGTH,
             "box_growth_limit": self.BOX_GROWTH_LIMIT,
             "auto_home": self.AUTO_HOME,
+            # Nozzle
+            "nozzle_serial_port": self.NOZZLE_SERIAL_PORT,
+            "nozzle_serial_baud": self.NOZZLE_SERIAL_BAUD,
+            "nozzle_serial_timeout": self.NOZZLE_SERIAL_TIMEOUT,
+            "nozzle_step_pin": self.NOZZLE_STEP_PIN,
+            "nozzle_dir_pin": self.NOZZLE_DIR_PIN,
+            "nozzle_en_pin": self.NOZZLE_EN_PIN,
+            "nozzle_limit_pin": self.NOZZLE_LIMIT_PIN,
+            "nozzle_steps_per_rev_base": self.NOZZLE_STEPS_PER_REV_BASE,
+            "nozzle_microstepping": self.NOZZLE_MICROSTEPPING,
+            "nozzle_min_angle": self.NOZZLE_MIN_ANGLE,
+            "nozzle_max_angle": self.NOZZLE_MAX_ANGLE,
+            "nozzle_normal_speed_us": self.NOZZLE_NORMAL_SPEED_US,
+            "nozzle_homing_speed_us": self.NOZZLE_HOMING_SPEED_US,
+            "nozzle_accel_steps": self.NOZZLE_ACCEL_STEPS,
+            "nozzle_accel_start_us": self.NOZZLE_ACCEL_START_US,
+            "nozzle_homing_dir": self.NOZZLE_HOMING_DIR,
+            "nozzle_homing_back_dir": self.NOZZLE_HOMING_BACK_DIR,
+            "nozzle_analog_pin": self.NOZZLE_ANALOG_PIN,
+            "nozzle_known_resistance": self.NOZZLE_KNOWN_RESISTANCE,
+            "nozzle_adc_sample_count": self.NOZZLE_ADC_SAMPLE_COUNT,
+            "nozzle_diode_threshold": self.NOZZLE_DIODE_THRESHOLD,
+            "nozzle_test_count": self.NOZZLE_TEST_COUNT,
+            "nozzle_test_interval": self.NOZZLE_TEST_INTERVAL,
         }
 
     def update_from_dict(self, data):
@@ -231,6 +298,30 @@ class Config:
         if "ocr_min_word_length" in data: self.OCR_MIN_WORD_LENGTH = int(data["ocr_min_word_length"])
         if "box_growth_limit" in data: self.BOX_GROWTH_LIMIT = float(data["box_growth_limit"])
         if "auto_home" in data: self.AUTO_HOME = bool(data["auto_home"])
+        # Nozzle
+        if "nozzle_serial_port" in data: self.NOZZLE_SERIAL_PORT = str(data["nozzle_serial_port"])
+        if "nozzle_serial_baud" in data: self.NOZZLE_SERIAL_BAUD = int(data["nozzle_serial_baud"])
+        if "nozzle_serial_timeout" in data: self.NOZZLE_SERIAL_TIMEOUT = int(data["nozzle_serial_timeout"])
+        if "nozzle_step_pin" in data: self.NOZZLE_STEP_PIN = int(data["nozzle_step_pin"])
+        if "nozzle_dir_pin" in data: self.NOZZLE_DIR_PIN = int(data["nozzle_dir_pin"])
+        if "nozzle_en_pin" in data: self.NOZZLE_EN_PIN = int(data["nozzle_en_pin"])
+        if "nozzle_limit_pin" in data: self.NOZZLE_LIMIT_PIN = int(data["nozzle_limit_pin"])
+        if "nozzle_steps_per_rev_base" in data: self.NOZZLE_STEPS_PER_REV_BASE = int(data["nozzle_steps_per_rev_base"])
+        if "nozzle_microstepping" in data: self.NOZZLE_MICROSTEPPING = int(data["nozzle_microstepping"])
+        if "nozzle_min_angle" in data: self.NOZZLE_MIN_ANGLE = float(data["nozzle_min_angle"])
+        if "nozzle_max_angle" in data: self.NOZZLE_MAX_ANGLE = float(data["nozzle_max_angle"])
+        if "nozzle_normal_speed_us" in data: self.NOZZLE_NORMAL_SPEED_US = int(data["nozzle_normal_speed_us"])
+        if "nozzle_homing_speed_us" in data: self.NOZZLE_HOMING_SPEED_US = int(data["nozzle_homing_speed_us"])
+        if "nozzle_accel_steps" in data: self.NOZZLE_ACCEL_STEPS = int(data["nozzle_accel_steps"])
+        if "nozzle_accel_start_us" in data: self.NOZZLE_ACCEL_START_US = int(data["nozzle_accel_start_us"])
+        if "nozzle_homing_dir" in data: self.NOZZLE_HOMING_DIR = int(data["nozzle_homing_dir"])
+        if "nozzle_homing_back_dir" in data: self.NOZZLE_HOMING_BACK_DIR = int(data["nozzle_homing_back_dir"])
+        if "nozzle_analog_pin" in data: self.NOZZLE_ANALOG_PIN = int(data["nozzle_analog_pin"])
+        if "nozzle_known_resistance" in data: self.NOZZLE_KNOWN_RESISTANCE = int(data["nozzle_known_resistance"])
+        if "nozzle_adc_sample_count" in data: self.NOZZLE_ADC_SAMPLE_COUNT = int(data["nozzle_adc_sample_count"])
+        if "nozzle_diode_threshold" in data: self.NOZZLE_DIODE_THRESHOLD = int(data["nozzle_diode_threshold"])
+        if "nozzle_test_count" in data: self.NOZZLE_TEST_COUNT = int(data["nozzle_test_count"])
+        if "nozzle_test_interval" in data: self.NOZZLE_TEST_INTERVAL = float(data["nozzle_test_interval"])
         
         # Target words'ü seçili gruba göre güncelle
         if self.TARGET_GROUP in self.OCR_GROUPS:
@@ -768,6 +859,540 @@ class PNPDriver:
             self.ser.close()
             log.info("PNP bağlantısı kapatıldı.")
         self.connected = False
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  NOZZLE CONTROLLER (Slave Arduino — Step Motor + Direnç + Diyot)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class NozzleController:
+    """
+    Slave Arduino üzerinden nozzle step motor kontrolü, direnç ölçümü
+    ve diyot testi yapan birleşik kontrol sınıfı.
+    pi_controller.py'deki ArduinoSlave, MotorController, ResistanceMeter
+    ve ComponentTester sınıflarının web-uyumlu birleşimi.
+    """
+
+    def __init__(self):
+        self.serial = None
+        self.connected = False
+        self.current_angle = 0.0
+        self.is_homed = False
+        self._lock = threading.Lock()
+
+    # ── Bağlantı Yönetimi ────────────────────────────────────────────────
+
+    def connect(self, port=None):
+        """Slave Arduino'ya bağlan."""
+        import serial as pyserial
+        with self._lock:
+            if self.connected:
+                return True, "Zaten bağlı."
+
+            port = port or config.NOZZLE_SERIAL_PORT
+            baud = config.NOZZLE_SERIAL_BAUD
+            timeout = config.NOZZLE_SERIAL_TIMEOUT
+
+            try:
+                self.serial = pyserial.Serial(port=port, baudrate=baud, timeout=timeout)
+                time.sleep(2)  # Arduino Auto-Reset stabilizasyonu
+
+                # Tampon mesajlarını temizle
+                while self.serial.in_waiting > 0:
+                    self.serial.readline()
+
+                self.connected = True
+                log.info(f"Nozzle Arduino bağlandı: {port}")
+
+                # Limit switch pinini INPUT_PULLUP yap
+                self._send_cmd(f"PMODE {config.NOZZLE_LIMIT_PIN} 2")
+                # Motoru serbest bırak
+                self._motor_enable(False)
+
+                # PING testi
+                resp, ok = self._send_cmd("PING")
+                if ok and resp == "PONG":
+                    log.info("Nozzle Arduino PING OK.")
+                else:
+                    log.warning("Nozzle Arduino PING yanıt yok, devam ediliyor...")
+
+                return True, f"Bağlantı başarılı: {port}"
+            except Exception as e:
+                self.connected = False
+                self.serial = None
+                err = f"Nozzle bağlantı hatası: {e}"
+                log.error(err)
+                return False, err
+
+    def disconnect(self):
+        """Bağlantıyı kes."""
+        with self._lock:
+            if self.serial and self.serial.is_open:
+                try:
+                    self.serial.close()
+                except Exception:
+                    pass
+            self.serial = None
+            self.connected = False
+            self.is_homed = False
+            log.info("Nozzle Arduino bağlantısı kesildi.")
+
+    def _send_cmd(self, cmd, timeout=15):
+        """Arduino'ya komut gönder ve yanıt al. Lock TUTMADAN çağırılmalı veya lock içinden."""
+        if not self.serial or not self.serial.is_open:
+            return "Bağlantı yok", False
+        try:
+            self.serial.reset_input_buffer()
+            self.serial.write(f"{cmd}\n".encode('utf-8'))
+
+            start = time.time()
+            while time.time() - start < timeout:
+                if self.serial.in_waiting > 0:
+                    response = self.serial.readline().decode('utf-8', errors='ignore').strip()
+                    if response.startswith("OK:"):
+                        return response[3:], True
+                    elif response == "OK":
+                        return "", True
+                    elif response.startswith("ERR:"):
+                        return response[4:], False
+                else:
+                    time.sleep(0.01)
+
+            return "Timeout: Arduino'dan yanıt alınamadı", False
+        except Exception as e:
+            return f"Seri port hatası: {e}", False
+
+    def send_command(self, cmd, timeout=15):
+        """Thread-safe komut gönderme (dışarıdan çağrılır)."""
+        with self._lock:
+            return self._send_cmd(cmd, timeout)
+
+    # ── Motor Kontrolü ───────────────────────────────────────────────────
+
+    def _motor_enable(self, enable: bool):
+        """Motoru aktif/pasif yap. Lock TUTMADAN çağırılır."""
+        val = 0 if enable else 1
+        self._send_cmd(f"EN {val}")
+
+    def motor_enable(self, enable: bool):
+        """Thread-safe motor enable."""
+        with self._lock:
+            self._motor_enable(enable)
+
+    def move_relative(self, degrees: float):
+        """Motoru göreceli döndür. Dönen: (hareket, yeni_poz, mesaj)"""
+        with self._lock:
+            if not self.connected:
+                return 0, self.current_angle, "Bağlantı yok!"
+
+            if degrees == 0:
+                return 0, self.current_angle, "Hareket yok."
+
+            min_a = config.NOZZLE_MIN_ANGLE
+            max_a = config.NOZZLE_MAX_ANGLE
+            new_angle = self.current_angle + degrees
+            clamped = False
+
+            if new_angle > max_a:
+                degrees = max_a - self.current_angle
+                clamped = True
+            elif new_angle < min_a:
+                degrees = min_a - self.current_angle
+                clamped = True
+
+            if abs(degrees) < 0.01:
+                return 0, self.current_angle, "Motor zaten sınır noktasında!"
+
+            steps_per_deg = (config.NOZZLE_STEPS_PER_REV_BASE * config.NOZZLE_MICROSTEPPING) / 360.0
+            steps = int(abs(degrees * steps_per_deg))
+            positive_dir = config.NOZZLE_HOMING_BACK_DIR
+            negative_dir = config.NOZZLE_HOMING_DIR
+            direction = positive_dir if degrees > 0 else negative_dir
+
+            if steps == 0:
+                return 0, self.current_angle, "Çok küçük açı."
+
+            self._motor_enable(True)
+            time.sleep(0.01)
+
+            cmd = (f"STEPG {steps} {direction} {config.NOZZLE_NORMAL_SPEED_US} "
+                   f"{config.NOZZLE_ACCEL_STEPS} {config.NOZZLE_ACCEL_START_US} "
+                   f"{config.NOZZLE_LIMIT_PIN}")
+            response, success = self._send_cmd(cmd, timeout=30)
+
+            time.sleep(0.05)
+            self._motor_enable(False)
+
+            if success:
+                if response == "ESTOP":
+                    self.is_homed = False
+                    return 0, self.current_angle, "⚠️ ACİL DURDURMA! Limit switch tetiklendi."
+                else:
+                    self.current_angle += degrees
+                    msg = f"{degrees:+.1f}° hareket"
+                    if clamped:
+                        msg += " (sınıra kırpıldı)"
+                    return degrees, self.current_angle, msg
+            else:
+                return 0, self.current_angle, f"Hata: {response}"
+
+    def goto_angle(self, target: float):
+        """Mutlak açıya git. Dönen: (hareket, yeni_poz, mesaj)"""
+        min_a = config.NOZZLE_MIN_ANGLE
+        max_a = config.NOZZLE_MAX_ANGLE
+        if target > max_a:
+            target = max_a
+        elif target < min_a:
+            target = min_a
+
+        delta = target - self.current_angle
+        if abs(delta) < 0.01:
+            return 0, self.current_angle, f"Zaten {target:.1f}° pozisyonunda."
+
+        return self.move_relative(delta)
+
+    def home(self):
+        """Homing (referans alma). Dönen: (başarılı, mesaj)"""
+        with self._lock:
+            if not self.connected:
+                return False, "Bağlantı yok!"
+
+            log.info("Nozzle homing başlatılıyor...")
+            self.is_homed = False  # Homing başında sıfırla
+
+            steps_per_deg = (config.NOZZLE_STEPS_PER_REV_BASE * config.NOZZLE_MICROSTEPPING) / 360.0
+            homing_dir = config.NOZZLE_HOMING_DIR
+            homing_back_dir = config.NOZZLE_HOMING_BACK_DIR
+            homing_speed = config.NOZZLE_HOMING_SPEED_US
+            limit_pin = config.NOZZLE_LIMIT_PIN
+
+            def _read_limit():
+                """Limit switch oku. True = basılı (LOW=0)."""
+                resp, ok = self._send_cmd(f"DREAD {limit_pin}", timeout=5)
+                return ok and resp == "0"
+
+            try:
+                # SERİ PORT TEMİZLİĞİ — uzun süre boşta kaldıysa buffer temizle
+                if self.serial and self.serial.is_open:
+                    self.serial.reset_input_buffer()
+                    self.serial.reset_output_buffer()
+                    time.sleep(0.05)
+
+                # PING TEST — Arduino'nun yanıt verdiğinden emin ol
+                ping_resp, ping_ok = self._send_cmd("PING", timeout=5)
+                if not ping_ok:
+                    self._motor_enable(False)
+                    return False, "Arduino yanıt vermiyor (PING başarısız)!"
+                time.sleep(0.05)
+
+                # MOTOR ENABLE — enable komutunu gönder ve doğrula
+                en_resp, en_ok = self._send_cmd("EN 0", timeout=5)
+                if not en_ok:
+                    log.warning(f"Motor enable yanıtı beklenmedik: {en_resp}")
+                time.sleep(0.15)  # Motor enable'ın oturması için bekle
+                if _read_limit():
+                    log.info("Nozzle: Zaten limit switch üzerinde, geri çekiliniyor...")
+                    backoff_pre = int(10.0 * steps_per_deg)
+                    self._send_cmd(f"STEP {backoff_pre} {homing_back_dir} {homing_speed} 0 {homing_speed}", timeout=15)
+                    time.sleep(0.5)
+                    if _read_limit():
+                        self._motor_enable(False)
+                        return False, "Limit switch'ten uzaklaşılamadı!"
+
+                # AŞAMA 1: Limit switch'e hızlı yaklaşma
+                max_steps = int(400 * steps_per_deg)
+                batch_size = 50
+                found = False
+                steps_taken = 0
+
+                while steps_taken < max_steps:
+                    if _read_limit():
+                        found = True
+                        break
+                    self._send_cmd(f"STEP {batch_size} {homing_dir} {homing_speed} 0 {homing_speed}", timeout=15)
+                    steps_taken += batch_size
+                    time.sleep(0.02)
+
+                if not found:
+                    self._motor_enable(False)
+                    return False, "Limit switch bulunamadı!"
+
+                time.sleep(0.5)
+
+                # AŞAMA 2: Geri çekilme (5°)
+                backoff = int(5.0 * steps_per_deg)
+                self._send_cmd(f"STEP {backoff} {homing_back_dir} {homing_speed} 0 {homing_speed}", timeout=15)
+                time.sleep(0.5)
+
+                # AŞAMA 3: Hassas yaklaşma (1. geçiş)
+                slow = homing_speed * 2
+                for _ in range(backoff + 100):
+                    if _read_limit():
+                        break
+                    self._send_cmd(f"STEP 1 {homing_dir} {slow} 0 {slow}", timeout=5)
+                    time.sleep(0.005)
+
+                time.sleep(0.5)
+
+                # AŞAMA 4: 2. geri çekilme (2°)
+                small_back = int(2.0 * steps_per_deg)
+                self._send_cmd(f"STEP {small_back} {homing_back_dir} {slow} 0 {slow}", timeout=15)
+                time.sleep(0.5)
+
+                # AŞAMA 5: Ultra hassas yaklaşma (2. geçiş)
+                ultra_slow = homing_speed * 4
+                for _ in range(small_back + 50):
+                    if _read_limit():
+                        break
+                    self._send_cmd(f"STEP 1 {homing_dir} {ultra_slow} 0 {ultra_slow}", timeout=5)
+                    time.sleep(0.005)
+
+                time.sleep(0.3)
+
+                # AŞAMA 6: Clearance (3° geri çekil)
+                clearance = int(3.0 * steps_per_deg)
+                self._send_cmd(f"STEP {clearance} {homing_back_dir} {homing_speed} 0 {homing_speed}", timeout=15)
+                time.sleep(0.2)
+
+                # AŞAMA 7: 0° olarak kaydet
+                self.current_angle = 0.0
+                self.is_homed = True
+                self._motor_enable(False)
+
+                log.info("Nozzle homing tamamlandı.")
+                return True, "Homing tamamlandı. Nozzle 0° pozisyonunda."
+
+            except Exception as e:
+                self._motor_enable(False)
+                self.is_homed = False
+                log.error(f"Nozzle homing hatası: {e}")
+                return False, f"Homing hatası: {e}"
+
+    # ── Direnç Ölçümü ────────────────────────────────────────────────────
+
+    def read_adc(self):
+        """A1 pininden ortalama ADC oku, ters çevir. Dönen: (adc, başarılı)"""
+        with self._lock:
+            if not self.connected:
+                return 0, False
+            resp, ok = self._send_cmd(
+                f"MULTI_AREAD {config.NOZZLE_ANALOG_PIN} {config.NOZZLE_ADC_SAMPLE_COUNT}"
+            )
+            if not ok:
+                return 0, False
+            raw = int(resp)
+            return (1023 - raw), True
+
+    def calculate_resistance(self, adc_value):
+        """ADC'den direnç hesapla. Dönen: (ohm, voltaj, durum)"""
+        if adc_value <= 5:
+            return float('inf'), 0, 'ACIK_DEVRE'
+        if adc_value >= 1018:
+            return 0, 5.0, 'KISA_DEVRE'
+        voltage = (adc_value / 1023) * 5.0
+        resistance = config.NOZZLE_KNOWN_RESISTANCE * (1023 - adc_value) / adc_value
+        return resistance, voltage, 'NORMAL'
+
+    def format_resistance(self, resistance):
+        """Direnci okunabilir string'e çevir."""
+        if resistance == float('inf'):
+            return "AÇIK DEVRE"
+        elif resistance == 0:
+            return "KISA DEVRE"
+        elif resistance >= 1_000_000:
+            return f"{resistance/1_000_000:.2f} MΩ"
+        elif resistance >= 1000:
+            return f"{resistance/1000:.2f} kΩ"
+        else:
+            return f"{resistance:.1f} Ω"
+
+    def read_resistance(self):
+        """Tek seferlik direnç ölçümü. Dönen: dict"""
+        adc, ok = self.read_adc()
+        if not ok:
+            return {"success": False, "error": "ADC okuma başarısız"}
+        resistance, voltage, status = self.calculate_resistance(adc)
+        return {
+            "success": True,
+            "resistance": resistance,
+            "resistance_formatted": self.format_resistance(resistance),
+            "adc": adc,
+            "voltage": round(voltage, 3),
+            "status": status
+        }
+
+    def read_diode(self):
+        """Tek seferlik diyot testi. Dönen: dict"""
+        adc, ok = self.read_adc()
+        if not ok:
+            return {"success": False, "error": "ADC okuma başarısız"}
+        threshold = config.NOZZLE_DIODE_THRESHOLD
+        passing = adc >= threshold
+        return {
+            "success": True,
+            "adc": adc,
+            "threshold": threshold,
+            "current_passing": passing,
+            "result": "AKIM GEÇİYOR ✅" if passing else "AKIM GEÇMİYOR ❌"
+        }
+
+    def resistance_test_multi(self, count=10, interval=1.0, socketio_ref=None):
+        """
+        Tekrarlı direnç testi. count kere ölçüm yapar, ortalamasını döndürür.
+        Her ölçümde SocketIO ile ilerleme bildirir.
+        """
+        results = []
+        for i in range(count):
+            r = self.read_resistance()
+            r['index'] = i + 1
+            results.append(r)
+
+            if socketio_ref:
+                socketio_ref.emit('nozzle_test_progress', {
+                    'test_type': 'resistance',
+                    'current': i + 1,
+                    'total': count,
+                    'result': r
+                })
+
+            if i < count - 1:
+                time.sleep(interval)
+
+        # Ortalama hesapla (sadece NORMAL olanlar)
+        valid = [r['resistance'] for r in results
+                 if r.get('success') and r.get('status') == 'NORMAL']
+
+        if valid:
+            avg = sum(valid) / len(valid)
+            avg_formatted = self.format_resistance(avg)
+            min_r = min(valid)
+            max_r = max(valid)
+            if len(valid) > 1:
+                variance = sum((x - avg) ** 2 for x in valid) / (len(valid) - 1)
+                std_dev = variance ** 0.5
+            else:
+                std_dev = 0
+        else:
+            avg = None
+            avg_formatted = "Geçerli ölçüm yok"
+            min_r = None
+            max_r = None
+            std_dev = 0
+
+        summary = {
+            'test_type': 'resistance',
+            'total': count,
+            'valid_count': len(valid),
+            'average': avg,
+            'average_formatted': avg_formatted,
+            'stats': {
+                'min': min_r,
+                'max': max_r,
+                'std': std_dev,
+                'min_formatted': self.format_resistance(min_r) if min_r is not None else '--',
+                'max_formatted': self.format_resistance(max_r) if max_r is not None else '--',
+                'std_formatted': self.format_resistance(std_dev) if std_dev else '--',
+            },
+            'measurements': results
+        }
+
+        if socketio_ref:
+            socketio_ref.emit('nozzle_test_result', summary)
+
+        return summary
+
+    def diode_test_multi(self, count=10, interval=1.0, auto_correct=True, socketio_ref=None):
+        """
+        Tekrarlı diyot testi. count kere ölçüm yapar, çoğunluk kararı verir.
+        6/10 çoğunluk ile "akım geçiyor/geçmiyor" kararı alır.
+        Geçmiyorsa ve auto_correct ise 180° dönüp tekrar test eder.
+        """
+        results = []
+        passing_count = 0
+
+        for i in range(count):
+            r = self.read_diode()
+            r['index'] = i + 1
+            results.append(r)
+            if r.get('success') and r.get('current_passing'):
+                passing_count += 1
+
+            if socketio_ref:
+                socketio_ref.emit('nozzle_test_progress', {
+                    'test_type': 'diode',
+                    'current': i + 1,
+                    'total': count,
+                    'passing_count': passing_count,
+                    'result': r
+                })
+
+            if i < count - 1:
+                time.sleep(interval)
+
+        majority = count // 2 + 1  # 6/10
+        is_passing = passing_count >= majority
+
+        # ADC İstatistikleri
+        adc_values = [r.get('adc', 0) for r in results if r.get('success')]
+        avg_adc = round(sum(adc_values) / len(adc_values)) if adc_values else 0
+        min_adc = min(adc_values) if adc_values else 0
+        max_adc = max(adc_values) if adc_values else 0
+
+        summary = {
+            'test_type': 'diode',
+            'total': count,
+            'passing_count': passing_count,
+            'majority_needed': majority,
+            'decision': 'AKIM GEÇİYOR ✅' if is_passing else 'AKIM GEÇMİYOR ❌',
+            'is_passing': is_passing,
+            'auto_corrected': False,
+            'stats': {
+                'avg_adc': avg_adc,
+                'min_adc': min_adc,
+                'max_adc': max_adc,
+                'threshold': config.NOZZLE_DIODE_THRESHOLD,
+            },
+            'measurements': results
+        }
+
+        # Otomatik düzeltme: akım geçmiyorsa nozzle'ı 180° döndür
+        if not is_passing and auto_correct:
+            log.info("Diyot testi BAŞARISIZ — Nozzle 180° döndürülüyor...")
+            if socketio_ref:
+                socketio_ref.emit('nozzle_test_progress', {
+                    'test_type': 'diode',
+                    'message': '🔄 Nozzle 180° döndürülüyor (otomatik düzeltme)...'
+                })
+
+            moved, new_pos, msg = self.move_relative(180.0)
+            summary['auto_corrected'] = True
+            summary['correction_move'] = msg
+            summary['new_angle'] = new_pos
+
+            if socketio_ref:
+                socketio_ref.emit('nozzle_test_progress', {
+                    'test_type': 'diode',
+                    'message': f'🔄 Nozzle {new_pos:.1f}° konumuna döndü. Tekrar test ediliyor...'
+                })
+
+            # Düzeltme sonrası kısa bekleme ve tekrar test
+            time.sleep(2.0)
+            retest = self.read_diode()
+            summary['retest_result'] = retest
+
+        if socketio_ref:
+            socketio_ref.emit('nozzle_test_result', summary)
+
+        return summary
+
+    def get_status(self):
+        """Nozzle durumunu dict olarak döndür."""
+        return {
+            "connected": self.connected,
+            "angle": round(self.current_angle, 1),
+            "is_homed": self.is_homed,
+            "port": config.NOZZLE_SERIAL_PORT
+        }
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1723,6 +2348,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 # Global nesneler
 camera = CameraManager()
 pnp = PNPDriver()
+nozzle = NozzleController()
 
 # ─── Kullanıcı kimlik bilgileri ──────────────────────────────────────────────
 USERNAME = "admin"
@@ -1925,10 +2551,22 @@ def api_home():
         success = pnp.home()
         socketio.emit('motor_update', pnp.get_status())
         socketio.emit('log_message', {
-            'message': 'Home ' + ('tamamlandı' if success else 'hatası!'),
+            'message': 'GRBL Home ' + ('tamamlandı' if success else 'hatası!'),
             'level': 'INFO' if success else 'ERROR',
             'timestamp': time.strftime('%H:%M:%S')
         })
+        # Nozzle'ı da homela
+        if nozzle.connected:
+            try:
+                nok, nmsg = nozzle.home()
+                socketio.emit('nozzle_status', nozzle.get_status())
+                socketio.emit('log_message', {
+                    'message': f'Nozzle Home: {nmsg}',
+                    'level': 'INFO' if nok else 'ERROR',
+                    'timestamp': time.strftime('%H:%M:%S')
+                })
+            except Exception as nhe:
+                log.warning(f"Nozzle Home hatası: {nhe}")
     threading.Thread(target=_home, daemon=True).start()
     return jsonify({'success': True, 'message': 'Home başlatıldı...'})
 
@@ -2133,9 +2771,14 @@ def run_scenario(scenario, pnp_ref, camera_ref, socketio_ref):
 
             elif stype == 'home':
                 pnp_ref.home()
-                emit('running', "Home'a gidildi.", i)
+                emit('running', "GRBL Home'a gidildi.", i)
                 time.sleep(0.5)
                 socketio_ref.emit('motor_update', pnp_ref.get_status())
+                # Nozzle'ı da homela
+                if nozzle.connected:
+                    emit('running', "🏠 Nozzle Home yapılıyor...", i)
+                    nozzle.home()
+                    socketio_ref.emit('nozzle_status', nozzle.get_status())
 
             elif stype == 'move_z':
                 z_val = float(step.get('z', 0))
@@ -2156,6 +2799,49 @@ def run_scenario(scenario, pnp_ref, camera_ref, socketio_ref):
                     if scenario_stop_flag:
                         emit('stopped', "Senaryo durduruldu (doğrulama sırasında).")
                         return
+
+            elif stype == 'resistance_test':
+                emit('running', "🔬 Direnç Testi yapılıyor (10 ölçüm)...", i)
+                if not nozzle.connected:
+                    emit('warning', "Nozzle Arduino bağlı değil! Direnç testi atlandı.", i)
+                else:
+                    count = int(step.get('test_count', config.NOZZLE_TEST_COUNT))
+                    interval = float(step.get('test_interval', config.NOZZLE_TEST_INTERVAL))
+                    result = nozzle.resistance_test_multi(count=count, interval=interval, socketio_ref=socketio_ref)
+                    avg_str = result.get('average_formatted', '?')
+                    emit('running', f"🔬 Direnç Testi Sonucu: {avg_str} ({result.get('valid_count', 0)}/{count} geçerli)", i)
+
+            elif stype == 'diode_test':
+                emit('running', "💡 Diyot Testi yapılıyor (10 ölçüm)...", i)
+                if not nozzle.connected:
+                    emit('warning', "Nozzle Arduino bağlı değil! Diyot testi atlandı.", i)
+                else:
+                    count = int(step.get('test_count', config.NOZZLE_TEST_COUNT))
+                    interval = float(step.get('test_interval', config.NOZZLE_TEST_INTERVAL))
+                    auto_correct = step.get('auto_correct', True)
+                    result = nozzle.diode_test_multi(count=count, interval=interval, auto_correct=auto_correct, socketio_ref=socketio_ref)
+                    decision = result.get('decision', '?')
+                    corrected = " (Otomatik düzeltildi)" if result.get('auto_corrected') else ""
+                    emit('running', f"💡 Diyot Testi Sonucu: {decision}{corrected}", i)
+
+            elif stype == 'nozzle_goto':
+                angle = float(step.get('angle', 0))
+                emit('running', f"🔄 Nozzle {angle}° açıya döndürülüyor...", i)
+                if not nozzle.connected:
+                    emit('warning', "Nozzle Arduino bağlı değil!", i)
+                else:
+                    moved, new_pos, msg = nozzle.goto_angle(angle)
+                    emit('running', f"🔄 Nozzle: {msg} | Pozisyon: {new_pos:.1f}°", i)
+                    socketio_ref.emit('nozzle_status', nozzle.get_status())
+
+            elif stype == 'nozzle_home':
+                emit('running', "🏠 Nozzle Homing yapılıyor...", i)
+                if not nozzle.connected:
+                    emit('warning', "Nozzle Arduino bağlı değil!", i)
+                else:
+                    success, msg = nozzle.home()
+                    emit('running', f"🏠 Nozzle: {msg}", i)
+                    socketio_ref.emit('nozzle_status', nozzle.get_status())
 
             else:
                 emit('warning', f"Bilinmeyen komut tipi: {stype}", i)
@@ -2183,6 +2869,10 @@ def _step_description(step):
     if t == 'move_z': return f"↕️ Z: {step.get('z', 0)}mm konumuna git"
     if t == 'home': return "🏠 Home pozisyonuna git"
     if t == 'verify': return "👁️ Doğruluk Kontrolü yap"
+    if t == 'resistance_test': return f"🔬 Direnç Testi ({step.get('test_count', 10)} ölçüm)"
+    if t == 'diode_test': return f"💡 Diyot Testi ({step.get('test_count', 10)} ölçüm)"
+    if t == 'nozzle_goto': return f"🔄 Nozzle {step.get('angle', 0)}° açıya git"
+    if t == 'nozzle_home': return "🏠 Nozzle Home"
     return f"❓ {t}"
 
 
@@ -2624,6 +3314,186 @@ def api_uptime():
     })
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+#  NOZZLE API ENDPOINT'LERİ
+# ═════════════════════════════════════════════════════════════════════════════
+
+@app.route('/api/nozzle/status')
+def api_nozzle_status():
+    """Nozzle durumunu döndür."""
+    return jsonify(nozzle.get_status())
+
+
+@app.route('/api/nozzle/connect', methods=['POST'])
+def api_nozzle_connect():
+    """Nozzle Arduino'ya bağlan."""
+    data = request.get_json(silent=True) or {}
+    port = data.get('port', None)
+    ok, msg = nozzle.connect(port)
+    status = nozzle.get_status()
+    if ok:
+        socketio.emit('nozzle_status', status)
+    return jsonify({"success": ok, "message": msg, "nozzle_status": status})
+
+
+@app.route('/api/nozzle/disconnect', methods=['POST'])
+def api_nozzle_disconnect():
+    """Nozzle bağlantısını kes."""
+    nozzle.disconnect()
+    status = nozzle.get_status()
+    socketio.emit('nozzle_status', status)
+    return jsonify({"success": True, "message": "Bağlantı kesildi.", "nozzle_status": status})
+
+
+@app.route('/api/nozzle/home', methods=['POST'])
+def api_nozzle_home():
+    """Nozzle homing yap."""
+    def _do():
+        ok, msg = nozzle.home()
+        socketio.emit('nozzle_status', nozzle.get_status())
+        socketio.emit('nozzle_home_result', {"success": ok, "message": msg})
+    threading.Thread(target=_do, daemon=True).start()
+    return jsonify({"success": True, "message": "Homing başlatıldı..."})
+
+
+@app.route('/api/nozzle/goto', methods=['POST'])
+def api_nozzle_goto():
+    """Nozzle'ı belirtilen açıya götür."""
+    data = request.get_json(silent=True) or {}
+    angle = float(data.get('angle', 0))
+    moved, new_pos, msg = nozzle.goto_angle(angle)
+    status = nozzle.get_status()
+    socketio.emit('nozzle_status', status)
+    return jsonify({"success": True, "moved": moved, "position": new_pos, "message": msg, "nozzle_status": status})
+
+
+@app.route('/api/nozzle/move_relative', methods=['POST'])
+def api_nozzle_move_relative():
+    """Nozzle'ı göreceli döndür."""
+    data = request.get_json(silent=True) or {}
+    degrees = float(data.get('degrees', 0))
+    moved, new_pos, msg = nozzle.move_relative(degrees)
+    status = nozzle.get_status()
+    socketio.emit('nozzle_status', status)
+    return jsonify({"success": True, "moved": moved, "position": new_pos, "message": msg, "nozzle_status": status})
+
+
+@app.route('/api/nozzle/motor_enable', methods=['POST'])
+def api_nozzle_motor_enable():
+    """Nozzle motorunu kilitle/serbest bırak."""
+    data = request.get_json(silent=True) or {}
+    enable = data.get('enable', False)
+    nozzle.motor_enable(enable)
+    return jsonify({"success": True, "enabled": enable})
+
+
+@app.route('/api/nozzle/read_resistance')
+def api_nozzle_read_resistance():
+    """Anlık direnç ölçümü."""
+    result = nozzle.read_resistance()
+    return jsonify(result)
+
+
+@app.route('/api/nozzle/read_diode')
+def api_nozzle_read_diode():
+    """Anlık diyot testi."""
+    result = nozzle.read_diode()
+    return jsonify(result)
+
+
+@app.route('/api/nozzle/resistance_test', methods=['POST'])
+def api_nozzle_resistance_test():
+    """Tekrarlı direnç testi (arka planda)."""
+    data = request.get_json(silent=True) or {}
+    count = int(data.get('count', config.NOZZLE_TEST_COUNT))
+    interval = float(data.get('interval', config.NOZZLE_TEST_INTERVAL))
+
+    def _do():
+        nozzle.resistance_test_multi(count=count, interval=interval, socketio_ref=socketio)
+
+    threading.Thread(target=_do, daemon=True).start()
+    return jsonify({"success": True, "message": f"Direnç testi başlatıldı ({count} ölçüm)..."})
+
+
+@app.route('/api/nozzle/diode_test', methods=['POST'])
+def api_nozzle_diode_test():
+    """Tekrarlı diyot testi (arka planda)."""
+    data = request.get_json(silent=True) or {}
+    count = int(data.get('count', config.NOZZLE_TEST_COUNT))
+    interval = float(data.get('interval', config.NOZZLE_TEST_INTERVAL))
+    auto_correct = data.get('auto_correct', True)
+
+    def _do():
+        nozzle.diode_test_multi(count=count, interval=interval, auto_correct=auto_correct, socketio_ref=socketio)
+
+    threading.Thread(target=_do, daemon=True).start()
+    return jsonify({"success": True, "message": f"Diyot testi başlatıldı ({count} ölçüm)..."})
+
+
+@app.route('/api/nozzle/config', methods=['GET', 'POST'])
+def api_nozzle_config():
+    """Nozzle ayarlarını getir veya güncelle."""
+    if request.method == 'GET':
+        return jsonify({
+            "serial_port": config.NOZZLE_SERIAL_PORT,
+            "serial_baud": config.NOZZLE_SERIAL_BAUD,
+            "serial_timeout": config.NOZZLE_SERIAL_TIMEOUT,
+            "step_pin": config.NOZZLE_STEP_PIN,
+            "dir_pin": config.NOZZLE_DIR_PIN,
+            "en_pin": config.NOZZLE_EN_PIN,
+            "limit_pin": config.NOZZLE_LIMIT_PIN,
+            "steps_per_rev_base": config.NOZZLE_STEPS_PER_REV_BASE,
+            "microstepping": config.NOZZLE_MICROSTEPPING,
+            "min_angle": config.NOZZLE_MIN_ANGLE,
+            "max_angle": config.NOZZLE_MAX_ANGLE,
+            "normal_speed_us": config.NOZZLE_NORMAL_SPEED_US,
+            "homing_speed_us": config.NOZZLE_HOMING_SPEED_US,
+            "accel_steps": config.NOZZLE_ACCEL_STEPS,
+            "accel_start_us": config.NOZZLE_ACCEL_START_US,
+            "homing_dir": config.NOZZLE_HOMING_DIR,
+            "homing_back_dir": config.NOZZLE_HOMING_BACK_DIR,
+            "analog_pin": config.NOZZLE_ANALOG_PIN,
+            "known_resistance": config.NOZZLE_KNOWN_RESISTANCE,
+            "adc_sample_count": config.NOZZLE_ADC_SAMPLE_COUNT,
+            "diode_threshold": config.NOZZLE_DIODE_THRESHOLD,
+            "test_count": config.NOZZLE_TEST_COUNT,
+            "test_interval": config.NOZZLE_TEST_INTERVAL,
+        })
+    else:
+        data = request.get_json(silent=True) or {}
+        mapping = {
+            "serial_port": ("NOZZLE_SERIAL_PORT", str),
+            "serial_baud": ("NOZZLE_SERIAL_BAUD", int),
+            "serial_timeout": ("NOZZLE_SERIAL_TIMEOUT", int),
+            "step_pin": ("NOZZLE_STEP_PIN", int),
+            "dir_pin": ("NOZZLE_DIR_PIN", int),
+            "en_pin": ("NOZZLE_EN_PIN", int),
+            "limit_pin": ("NOZZLE_LIMIT_PIN", int),
+            "steps_per_rev_base": ("NOZZLE_STEPS_PER_REV_BASE", int),
+            "microstepping": ("NOZZLE_MICROSTEPPING", int),
+            "min_angle": ("NOZZLE_MIN_ANGLE", float),
+            "max_angle": ("NOZZLE_MAX_ANGLE", float),
+            "normal_speed_us": ("NOZZLE_NORMAL_SPEED_US", int),
+            "homing_speed_us": ("NOZZLE_HOMING_SPEED_US", int),
+            "accel_steps": ("NOZZLE_ACCEL_STEPS", int),
+            "accel_start_us": ("NOZZLE_ACCEL_START_US", int),
+            "homing_dir": ("NOZZLE_HOMING_DIR", int),
+            "homing_back_dir": ("NOZZLE_HOMING_BACK_DIR", int),
+            "analog_pin": ("NOZZLE_ANALOG_PIN", int),
+            "known_resistance": ("NOZZLE_KNOWN_RESISTANCE", int),
+            "adc_sample_count": ("NOZZLE_ADC_SAMPLE_COUNT", int),
+            "diode_threshold": ("NOZZLE_DIODE_THRESHOLD", int),
+            "test_count": ("NOZZLE_TEST_COUNT", int),
+            "test_interval": ("NOZZLE_TEST_INTERVAL", float),
+        }
+        for key, (attr, converter) in mapping.items():
+            if key in data:
+                setattr(config, attr, converter(data[key]))
+
+        config.save_config()
+        return jsonify({"success": True, "message": "Nozzle ayarları güncellendi."})
+
+
 # ─── SocketIO Olayları ──────────────────────────────────────────────────────
 
 @socketio.on('connect')
@@ -2647,6 +3517,8 @@ def handle_connect():
         'ocr': ocr_data,
         'auto_centering': camera.auto_centering,
     })
+    # Nozzle durumunu da gönder
+    socketio.emit('nozzle_status', nozzle.get_status())
 
 
 @socketio.on('request_status')
@@ -2726,6 +3598,23 @@ def main():
                 log.warning(f"Otomatik Home hatası: {he}")
     except Exception as e:
         log.warning(f"PNP bağlantısı kurulamadı: {e} — simülasyon modunda devam")
+
+    # 2b. Nozzle Arduino'ya bağlan
+    try:
+        ok, msg = nozzle.connect()
+        if ok:
+            log.info(f"Nozzle Arduino bağlandı: {msg}")
+            if config.AUTO_HOME:
+                log.info("Nozzle Otomatik Home başlatılıyor...")
+                try:
+                    success, hmsg = nozzle.home()
+                    log.info(f"Nozzle Home: {hmsg}")
+                except Exception as nhe:
+                    log.warning(f"Nozzle Home hatası: {nhe}")
+        else:
+            log.warning(f"Nozzle bağlantısı kurulamadı: {msg}")
+    except Exception as ne:
+        log.warning(f"Nozzle bağlantısı kurulamadı: {ne} — nozzle olmadan devam")
 
     # 3. Kamera thread'ini başlat
     cam_thread = threading.Thread(target=camera.camera_worker, daemon=True)

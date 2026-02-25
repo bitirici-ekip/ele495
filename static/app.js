@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
 /* ═══ SOCKET.IO ═══ */
 function initSocket() {
     socket = io();
-    socket.on('connect', () => { addC('✓ Bağlantı kuruldu.', 'info'); setBadge('motorBadge', 'motorBadgeTxt', 'Motor', 'ok'); });
+    socket.on('connect', () => { addC('✓ Bağlantı kuruldu.', 'info'); setBadge('motorBadge', 'motorBadgeTxt', 'Motor', 'ok'); refreshNozzleStatus(); });
     socket.on('disconnect', () => { addC('✗ Bağlantı kesildi!', 'error'); setBadge('motorBadge', 'motorBadgeTxt', 'Bağlantı Yok', 'err'); });
     socket.on('status_update', (d) => {
         if (d.motor) updateMotor(d.motor);
@@ -273,6 +273,7 @@ function switchTab(id) {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     const tab = document.getElementById('tab-' + id); if (tab) tab.classList.add('active');
     const btn = document.querySelector(`[data-tab="${id}"]`); if (btn) btn.classList.add('active');
+    if (id === 'nozzle') refreshNozzleStatus();
 }
 
 /* ═══ THEME ═══ */
@@ -922,6 +923,59 @@ async function quickGotoBaseMain() {
     gotoBaseDirect(name);
 }
 
+async function quickReadResistance() {
+    const hud = $('quickMeasurementHUD');
+    const box = $('qmResBox');
+    if (hud) hud.style.display = 'block';
+    if (box) box.style.display = 'block';
+    $('qmResValue').textContent = '...';
+    $('qmResValue').style.color = '#66bb6a';
+    $('qmResDetail').textContent = 'Ölçülüyor...';
+    try {
+        const r = await fetch('/api/nozzle/read_resistance').then(res => res.json());
+        if (r.success) {
+            $('qmResValue').textContent = r.resistance_formatted;
+            $('qmResDetail').textContent = `ADC: ${r.adc} | V: ${r.voltage}V | ${r.status}`;
+            if (r.status !== 'NORMAL') $('qmResValue').style.color = '#f44336';
+        } else {
+            $('qmResValue').textContent = 'HATA';
+            $('qmResValue').style.color = '#f44336';
+            $('qmResDetail').textContent = r.error || 'Bağlantı yok';
+        }
+    } catch (e) {
+        $('qmResValue').textContent = 'HATA';
+        $('qmResValue').style.color = '#f44336';
+        $('qmResDetail').textContent = 'Bağlantı hatası';
+    }
+}
+
+async function quickReadDiode() {
+    const hud = $('quickMeasurementHUD');
+    const box = $('qmDiodeBox');
+    if (hud) hud.style.display = 'block';
+    if (box) box.style.display = 'block';
+    $('qmDiodeValue').textContent = '...';
+    $('qmDiodeValue').style.color = '#ce93d8';
+    $('qmDiodeDetail').textContent = 'Ölçülüyor...';
+    try {
+        const r = await fetch('/api/nozzle/read_diode').then(res => res.json());
+        if (r.success) {
+            const passing = r.current_passing;
+            $('qmDiodeValue').textContent = passing ? 'AKIM GEÇİYOR ✅' : 'AKIM GEÇMİYOR ❌';
+            $('qmDiodeValue').style.color = passing ? '#4caf50' : '#f44336';
+            $('qmDiodeDetail').textContent = `ADC: ${r.adc} | Eşik: ${r.threshold} | ${r.result}`;
+        } else {
+            $('qmDiodeValue').textContent = 'HATA';
+            $('qmDiodeValue').style.color = '#f44336';
+            $('qmDiodeDetail').textContent = r.error || 'Bağlantı yok';
+        }
+    } catch (e) {
+        $('qmDiodeValue').textContent = 'HATA';
+        $('qmDiodeValue').style.color = '#f44336';
+        $('qmDiodeDetail').textContent = 'Bağlantı hatası';
+    }
+}
+
 async function setZoom(val) {
     const v = parseFloat(val);
     $('zoomVal').textContent = 'x' + v.toFixed(1);
@@ -974,7 +1028,7 @@ function renderScenarioList() {
             <td>${s.steps ? s.steps.length : 0}</td>
             <td style="text-align:right; white-space:nowrap">
                 <button class="btn-sm" style="background:#4caf50;color:#fff" onclick="editScenario('${esc(s.name)}')">✏️</button>
-                <button class="btn-sm" style="background:var(--blue);color:#fff" onclick="copyScenarioToClipboard('${esc(s.name)}')">📋 Kopyala</button>
+                <button class="btn-sm" style="background:var(--blue);color:#fff" onclick="duplicateScenario('${esc(s.name)}')">📋 Çoğalt</button>
                 <button class="btn-sm" style="background:#d32f2f;color:#fff" onclick="deleteScenario('${esc(s.name)}')">Sil</button>
                 <button class="btn-sm" style="background:#1976d2;color:#fff" onclick="runScenarioByName('${esc(s.name)}')">▶ Çalıştır</button>
             </td>
@@ -1000,44 +1054,35 @@ function updateScenarioDropdown() {
     }
 }
 
-// — Copy/Paste Scenarios —
-async function pasteScenarioFromClipboard() {
-    try {
-        const text = await navigator.clipboard.readText();
-        if (!text) { showToast('Pano boş!', 'warning'); return; }
-        let parsed = null;
-        try {
-            parsed = JSON.parse(text);
-        } catch (e) {
-            showToast('Panodaki veri geçerli JSON değil!', 'error');
-            return;
-        }
+// — Duplicate Scenarios —
+async function duplicateScenario(name) {
+    const s = _scenariosList.find(item => item.name === name);
+    if (!s) return;
 
-        if (!parsed.name || !Array.isArray(parsed.steps)) {
-            showToast('Panodaki veri geçerli bir senaryo formatı değil!', 'error');
-            return;
-        }
+    let newName = s.name + ' (Kopya)';
+    let counter = 1;
+    let finalName = newName;
+    while (_scenariosList.find(item => item.name === finalName)) {
+        counter++;
+        finalName = s.name + ` (Kopya ${counter})`;
+    }
 
-        $('scenarioName').value = parsed.name + ' (Kopya)';
-        _scenarioSteps = parsed.steps;
-        renderScenarioSteps();
-        showToast('Senaryo panodan yüklendi. Kaydetmeyi unutmayın!', 'info');
-    } catch (e) {
-        console.error('Panodan okuma hatası', e);
-        showToast('Panoya erişilemedi veya izin verilmedi.', 'error');
+    const r = await api('/api/scenarios', { name: finalName, steps: s.steps });
+    if (r.success) {
+        showToast(`'${finalName}' başarıyla oluşturuldu.`, 'info');
+        _scenariosList = r.scenarios;
+        renderScenarioList();
+        updateScenarioDropdown();
+    } else {
+        showToast('Hata: ' + r.message, 'error');
     }
 }
 
-function copyScenarioToClipboard(name) {
-    const s = _scenariosList.find(item => item.name === name);
-    if (!s) return;
-    const data = JSON.stringify(s, null, 2);
-    navigator.clipboard.writeText(data).then(() => {
-        showToast(`'${name}' panoya kopyalandı!`, 'info');
-    }).catch(err => {
-        console.error('Kopyalama hatası', err);
-        showToast('Kopyalama başarısız.', 'error');
-    });
+// — Create New Scenario —
+function createNewScenario() {
+    clearScenarioSteps();
+    $('scenarioName').focus();
+    showToast('Yeni senaryo oluşturmak için temizlendi.', 'info');
 }
 
 // — Step Builder —
@@ -1058,6 +1103,12 @@ function onStepTypeChange() {
         box.style.display = '';
     } else if (type === 'move_z') {
         box.innerHTML = `<input type="number" class="cfg-in" id="stepZInput" placeholder="Z (mm)" value="-163">`;
+        box.style.display = '';
+    } else if (type === 'nozzle_goto') {
+        box.innerHTML = `<input type="number" class="cfg-in" id="stepNozzleAngle" placeholder="Açı (0-180°)" value="0" min="0" max="180">`;
+        box.style.display = '';
+    } else if (type === 'resistance_test' || type === 'diode_test') {
+        box.innerHTML = `<input type="number" class="cfg-in" id="stepTestCount" placeholder="Test Sayısı" value="10" min="1" max="100">`;
         box.style.display = '';
     } else {
         box.innerHTML = '';
@@ -1087,6 +1138,15 @@ function addScenarioStep() {
         const z = parseFloat(inp ? inp.value : 0);
         if (isNaN(z)) { showToast('Geçerli Z değeri girin!', 'error'); return; }
         step.z = z;
+    } else if (type === 'nozzle_goto') {
+        const inp = $('stepNozzleAngle');
+        let a = parseFloat(inp ? inp.value : 0);
+        if (isNaN(a)) { showToast('Geçerli açı değeri girin!', 'error'); return; }
+        a = Math.max(0, Math.min(180, a));
+        step.angle = a;
+    } else if (type === 'resistance_test' || type === 'diode_test') {
+        const inp = $('stepTestCount');
+        step.test_count = parseInt(inp ? inp.value : 10) || 10;
     }
 
     if (_editingStepIndex >= 0) {
@@ -1129,6 +1189,12 @@ function editScenarioStep(idx) {
         } else if (step.type === 'move_z') {
             const inp = $('stepZInput');
             if (inp) inp.value = step.z;
+        } else if (step.type === 'nozzle_goto') {
+            const inp = $('stepNozzleAngle');
+            if (inp) inp.value = step.angle;
+        } else if (step.type === 'resistance_test' || step.type === 'diode_test') {
+            const inp = $('stepTestCount');
+            if (inp) inp.value = step.test_count || 10;
         }
     }, 0);
 
@@ -1191,6 +1257,10 @@ function stepLabel(step) {
     if (t === 'move_z') return `↕️ Z: ${step.z}mm konumuna git`;
     if (t === 'home') return '🏠 Home';
     if (t === 'verify') return '👁️ Doğruluk Kontrolü';
+    if (t === 'resistance_test') return `🔬 Direnç Testi (${step.test_count || 10} ölçüm)`;
+    if (t === 'diode_test') return `💡 Diyot Testi (${step.test_count || 10} ölçüm)`;
+    if (t === 'nozzle_goto') return `🔄 Nozzle ${step.angle || 0}° açıya git`;
+    if (t === 'nozzle_home') return '🏠 Nozzle Home';
     return `❓ ${t}`;
 }
 
@@ -1642,3 +1712,409 @@ loadMasterScenarios();
 loadVerification();
 onStepTypeChange(); // init param box
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOZZLE CONTROLLER (Slave Arduino — Step Motor + Direnç + Diyot)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+// ─── Measurement Storage ────────────────────────────────────────────────────
+let _nzResMeasurements = [];
+let _nzDiodeMeasurements = [];
+
+// ─── SocketIO Listeners ─────────────────────────────────────────────────────
+
+socket.on('nozzle_status', (d) => {
+    updateNozzleUI(d);
+});
+
+socket.on('nozzle_home_result', (d) => {
+    showToast(d.message, d.success ? 'info' : 'error');
+});
+
+socket.on('nozzle_test_progress', (d) => {
+    if (d.test_type === 'resistance') {
+        const prog = $('nzResProgress');
+        if (!prog) return;
+        const total = d.total || 10;
+        const current = d.current || 0;
+
+        // Initialize dots if first call
+        if (current === 1 || prog.children.length !== total) {
+            prog.innerHTML = '';
+            for (let i = 0; i < total; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'nz-test-dot';
+                dot.textContent = i + 1;
+                prog.appendChild(dot);
+            }
+        }
+
+        // Store measurement
+        if (d.result && current > 0) {
+            _nzResMeasurements[current - 1] = d.result;
+
+            const dot = prog.children[current - 1];
+            if (dot) {
+                dot.classList.add(d.result.status === 'NORMAL' ? 'pass' : 'fail');
+                dot.classList.add('active');
+                dot.title = d.result.resistance_formatted || '';
+            }
+            if (current > 1 && prog.children[current - 2]) {
+                prog.children[current - 2].classList.remove('active');
+            }
+        }
+
+        // Update instant display
+        if (d.result && d.result.success) {
+            $('nzResValue').textContent = d.result.resistance_formatted;
+            $('nzResDetails').textContent = `ADC: ${d.result.adc} | V: ${d.result.voltage}V | ${d.result.status}`;
+        }
+    }
+
+    if (d.test_type === 'diode') {
+        if (d.message) {
+            showToast(d.message, 'info');
+            return;
+        }
+        const prog = $('nzDiodeProgress');
+        if (!prog) return;
+        const total = d.total || 10;
+        const current = d.current || 0;
+
+        if (current === 1 || prog.children.length !== total) {
+            prog.innerHTML = '';
+            for (let i = 0; i < total; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'nz-test-dot';
+                dot.textContent = i + 1;
+                prog.appendChild(dot);
+            }
+        }
+
+        // Store measurement
+        if (d.result && current > 0) {
+            _nzDiodeMeasurements[current - 1] = d.result;
+
+            const dot = prog.children[current - 1];
+            if (dot) {
+                dot.classList.add(d.result.current_passing ? 'pass' : 'fail');
+                dot.classList.add('active');
+                dot.textContent = d.result.current_passing ? '✓' : '✗';
+            }
+            if (current > 1 && prog.children[current - 2]) {
+                prog.children[current - 2].classList.remove('active');
+            }
+        }
+
+        // Update instant display
+        if (d.result && d.result.success) {
+            $('nzDiodeValue').textContent = d.result.result;
+            $('nzDiodeValue').style.color = d.result.current_passing ? 'var(--green)' : '#f44336';
+            $('nzDiodeDetails').textContent = `ADC: ${d.result.adc} | Eşik: ${d.result.threshold}`;
+        }
+    }
+});
+
+socket.on('nozzle_test_result', (d) => {
+    if (d.test_type === 'resistance') {
+        const el = $('nzResTestResult');
+        if (el) {
+            el.style.display = 'block';
+            el.innerHTML = _buildResistanceDetailReport(d);
+        }
+        showToast(`Direnç Testi Tamamlandı: ${d.average_formatted}`, 'info');
+    }
+
+    if (d.test_type === 'diode') {
+        const el = $('nzDiodeTestResult');
+        if (el) {
+            el.style.display = 'block';
+            el.innerHTML = _buildDiodeDetailReport(d);
+        }
+        showToast(`Diyot Testi: ${d.decision}`, d.is_passing ? 'info' : 'warning');
+    }
+});
+
+// ─── Detail Report Builders ─────────────────────────────────────────────────
+
+function _buildResistanceDetailReport(d) {
+    const cls = d.valid_count > 0 ? 'pass' : 'fail';
+    let h = `<div class="nz-decision ${cls}" style="margin-bottom:8px">
+        ORTALAMA: ${d.average_formatted}<br>
+        <span style="font-size:0.7rem;font-weight:400">${d.valid_count}/${d.total} geçerli ölçüm</span>
+    </div>`;
+
+    // Statistics
+    if (d.stats) {
+        h += `<div class="nz-stat-grid">
+            <div class="nz-stat-box"><div class="nz-stat-label">Min</div><div class="nz-stat-value">${d.stats.min_formatted}</div></div>
+            <div class="nz-stat-box"><div class="nz-stat-label">Max</div><div class="nz-stat-value">${d.stats.max_formatted}</div></div>
+            <div class="nz-stat-box"><div class="nz-stat-label">Std Sapma</div><div class="nz-stat-value">${d.stats.std_formatted}</div></div>
+            <div class="nz-stat-box"><div class="nz-stat-label">Geçerli</div><div class="nz-stat-value">${d.valid_count}/${d.total}</div></div>
+        </div>`;
+    }
+
+    // Detail table from stored measurements
+    const measurements = d.measurements || _nzResMeasurements;
+    if (measurements && measurements.length > 0) {
+        h += `<div style="max-height:150px;overflow-y:auto;margin-top:6px">
+        <table class="nz-detail-table">
+            <thead><tr><th>#</th><th>ADC</th><th>Voltaj</th><th>Direnç</th><th>Durum</th></tr></thead>
+            <tbody>`;
+        measurements.forEach((m, i) => {
+            if (!m) return;
+            const statusColor = m.status === 'NORMAL' ? '#4caf50' : '#f44336';
+            const statusIcon = m.status === 'NORMAL' ? '✓' : m.status === 'ACIK_DEVRE' ? '∞' : '⚡';
+            h += `<tr>
+                <td style="color:#666">${i + 1}</td>
+                <td>${m.adc || '--'}</td>
+                <td>${m.voltage !== undefined ? m.voltage + 'V' : '--'}</td>
+                <td style="font-weight:600;color:var(--green)">${m.resistance_formatted || '--'}</td>
+                <td style="color:${statusColor}">${statusIcon} ${m.status || '--'}</td>
+            </tr>`;
+        });
+        h += `</tbody></table></div>`;
+    }
+
+    return h;
+}
+
+function _buildDiodeDetailReport(d) {
+    const cls = d.is_passing ? 'pass' : 'fail';
+    let h = `<div class="nz-decision ${cls}" style="margin-bottom:8px">
+        ${d.decision}<br>
+        <span style="font-size:0.7rem;font-weight:400">${d.passing_count}/${d.total} akım geçti (≥${d.majority_needed} gerekli)</span>
+    </div>`;
+
+    if (d.auto_corrected) {
+        h += `<div style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:6px;padding:6px;margin-bottom:6px;font-size:0.72rem;color:var(--blue);text-align:center">
+            🔄 Otomatik düzeltme uygulandı — Nozzle 180° döndürüldü
+        </div>`;
+    }
+
+    // Statistics 
+    if (d.stats) {
+        h += `<div class="nz-stat-grid">
+            <div class="nz-stat-box"><div class="nz-stat-label">Ort. ADC</div><div class="nz-stat-value">${d.stats.avg_adc}</div></div>
+            <div class="nz-stat-box"><div class="nz-stat-label">Eşik</div><div class="nz-stat-value">${d.stats.threshold}</div></div>
+            <div class="nz-stat-box"><div class="nz-stat-label">Min ADC</div><div class="nz-stat-value">${d.stats.min_adc}</div></div>
+            <div class="nz-stat-box"><div class="nz-stat-label">Max ADC</div><div class="nz-stat-value">${d.stats.max_adc}</div></div>
+        </div>`;
+    }
+
+    // Detail table from stored measurements
+    const measurements = d.measurements || _nzDiodeMeasurements;
+    if (measurements && measurements.length > 0) {
+        h += `<div style="max-height:150px;overflow-y:auto;margin-top:6px">
+        <table class="nz-detail-table">
+            <thead><tr><th>#</th><th>ADC</th><th>Eşik</th><th>Fark</th><th>Sonuç</th></tr></thead>
+            <tbody>`;
+        measurements.forEach((m, i) => {
+            if (!m) return;
+            const passing = m.current_passing;
+            const diff = m.adc - (m.threshold || 0);
+            const diffColor = diff >= 0 ? '#4caf50' : '#f44336';
+            h += `<tr>
+                <td style="color:#666">${i + 1}</td>
+                <td>${m.adc || '--'}</td>
+                <td style="color:#888">${m.threshold || '--'}</td>
+                <td style="color:${diffColor};font-weight:600">${diff >= 0 ? '+' : ''}${diff}</td>
+                <td style="color:${passing ? '#4caf50' : '#f44336'};font-weight:bold">${passing ? '✅ GEÇİYOR' : '❌ GEÇMİYOR'}</td>
+            </tr>`;
+        });
+        h += `</tbody></table></div>`;
+    }
+
+    return h;
+}
+
+// ─── Nozzle UI Update ───────────────────────────────────────────────────────
+
+function updateNozzleUI(d) {
+    if (!d) return;
+    const dot = $('nzStatusDot');
+    const status = $('nzConnStatus');
+    const angle = $('nzAngle');
+    const badge = $('nzHomedBadge');
+
+    if (dot) { dot.className = 'nz-status-dot ' + (d.connected ? 'on' : 'off'); }
+    if (status) {
+        status.textContent = d.connected ? 'Bağlı ✓' : 'Bağlı Değil';
+        status.style.color = d.connected ? '#4caf50' : '#f44336';
+    }
+    if (angle) { angle.innerHTML = `${d.angle.toFixed(1)}<span class="nz-unit">°</span>`; }
+    if (badge) {
+        if (d.is_homed) {
+            badge.textContent = 'HOMED ✓';
+            badge.style.background = '#4caf50';
+        } else {
+            badge.textContent = 'HOME YOK';
+            badge.style.background = '#f44336';
+        }
+    }
+}
+
+// ─── Nozzle Functions ───────────────────────────────────────────────────────
+
+async function nozzleConnect() {
+    const port = $('nzPort') ? $('nzPort').value : '';
+    const body = port ? { port } : {};
+    const r = await api('/api/nozzle/connect', body);
+    showToast(r.message, r.success ? 'info' : 'error');
+    if (r.nozzle_status) updateNozzleUI(r.nozzle_status);
+    else await refreshNozzleStatus();
+}
+
+async function nozzleDisconnect() {
+    const r = await api('/api/nozzle/disconnect');
+    showToast(r.message, 'info');
+    if (r.nozzle_status) updateNozzleUI(r.nozzle_status);
+    else await refreshNozzleStatus();
+}
+
+async function nozzleHome() {
+    showToast('Nozzle Homing başlatıldı...', 'info');
+    const r = await api('/api/nozzle/home');
+    if (!r.success) showToast(r.message, 'error');
+    setTimeout(refreshNozzleStatus, 2000);
+    setTimeout(refreshNozzleStatus, 5000);
+    setTimeout(refreshNozzleStatus, 10000);
+    setTimeout(refreshNozzleStatus, 20000);
+}
+
+async function nozzleGoto() {
+    const angle = parseFloat($('nzTargetAngle') ? $('nzTargetAngle').value : 0);
+    const r = await api('/api/nozzle/goto', { angle });
+    showToast(r.message, 'info');
+    if (r.nozzle_status) updateNozzleUI(r.nozzle_status);
+    else await refreshNozzleStatus();
+}
+
+async function nozzleMoveRel(degrees) {
+    const r = await api('/api/nozzle/move_relative', { degrees });
+    showToast(r.message, 'info');
+    if (r.nozzle_status) updateNozzleUI(r.nozzle_status);
+    else await refreshNozzleStatus();
+}
+
+async function refreshNozzleStatus() {
+    try {
+        const st = await fetch('/api/nozzle/status').then(res => res.json());
+        updateNozzleUI(st);
+    } catch (e) { /* ignore */ }
+}
+
+async function nozzleReadResistance() {
+    try {
+        const r = await fetch('/api/nozzle/read_resistance').then(res => res.json());
+        if (r.success) {
+            $('nzResValue').textContent = r.resistance_formatted;
+            $('nzResDetails').textContent = `ADC: ${r.adc} | V: ${r.voltage}V | ${r.status}`;
+        } else {
+            showToast('Direnç okuma hatası: ' + (r.error || ''), 'error');
+        }
+    } catch (e) {
+        showToast('Direnç okuma hatası!', 'error');
+    }
+}
+
+async function nozzleReadDiode() {
+    try {
+        const r = await fetch('/api/nozzle/read_diode').then(res => res.json());
+        if (r.success) {
+            $('nzDiodeValue').textContent = r.result;
+            $('nzDiodeValue').style.color = r.current_passing ? 'var(--green)' : '#f44336';
+            $('nzDiodeDetails').textContent = `ADC: ${r.adc} | Eşik: ${r.threshold}`;
+        } else {
+            showToast('Diyot okuma hatası: ' + (r.error || ''), 'error');
+        }
+    } catch (e) {
+        showToast('Diyot okuma hatası!', 'error');
+    }
+}
+
+async function nozzleResistanceTest() {
+    // Reset progress and stored measurements
+    _nzResMeasurements = [];
+    const prog = $('nzResProgress');
+    if (prog) prog.innerHTML = '';
+    const res = $('nzResTestResult');
+    if (res) res.style.display = 'none';
+
+    showToast('Tekrarlı direnç testi başlatılıyor...', 'info');
+    const r = await api('/api/nozzle/resistance_test', {});
+    if (!r.success) showToast(r.message, 'error');
+}
+
+async function nozzleDiodeTest() {
+    // Reset progress and stored measurements
+    _nzDiodeMeasurements = [];
+    const prog = $('nzDiodeProgress');
+    if (prog) prog.innerHTML = '';
+    const res = $('nzDiodeTestResult');
+    if (res) res.style.display = 'none';
+
+    const autoCorrect = $('nzAutoCorrect') ? $('nzAutoCorrect').checked : true;
+    showToast('Tekrarlı diyot testi başlatılıyor...', 'info');
+    const r = await api('/api/nozzle/diode_test', { auto_correct: autoCorrect });
+    if (!r.success) showToast(r.message, 'error');
+}
+
+async function loadNozzleConfig() {
+    try {
+        const r = await fetch('/api/nozzle/config').then(res => res.json());
+        if ($('nzPort')) $('nzPort').value = r.serial_port || '';
+        if ($('nzCfgStepsRev')) $('nzCfgStepsRev').value = r.steps_per_rev_base || 200;
+        if ($('nzCfgMicrostep')) $('nzCfgMicrostep').value = r.microstepping || 16;
+        if ($('nzCfgMinAngle')) $('nzCfgMinAngle').value = r.min_angle || -180;
+        if ($('nzCfgMaxAngle')) $('nzCfgMaxAngle').value = r.max_angle || 180;
+        if ($('nzCfgNormalSpeed')) $('nzCfgNormalSpeed').value = r.normal_speed_us || 400;
+        if ($('nzCfgHomingSpeed')) $('nzCfgHomingSpeed').value = r.homing_speed_us || 2000;
+        if ($('nzCfgAccelSteps')) $('nzCfgAccelSteps').value = r.accel_steps || 200;
+        if ($('nzCfgAccelStart')) $('nzCfgAccelStart').value = r.accel_start_us || 2000;
+        if ($('nzCfgLimitPin')) $('nzCfgLimitPin').value = r.limit_pin || 9;
+        if ($('nzCfgAnalogPin')) $('nzCfgAnalogPin').value = r.analog_pin || 1;
+        if ($('nzCfgHomingDir')) $('nzCfgHomingDir').value = r.homing_dir || 1;
+        if ($('nzCfgBackDir')) $('nzCfgBackDir').value = r.homing_back_dir || 0;
+        if ($('nzCfgKnownR')) $('nzCfgKnownR').value = r.known_resistance || 10000;
+        if ($('nzCfgAdcSamples')) $('nzCfgAdcSamples').value = r.adc_sample_count || 20;
+        if ($('nzCfgDiodeThreshold')) $('nzCfgDiodeThreshold').value = r.diode_threshold || 500;
+        if ($('nzCfgTestCount')) $('nzCfgTestCount').value = r.test_count || 10;
+        if ($('nzCfgTestInterval')) $('nzCfgTestInterval').value = r.test_interval || 1.0;
+
+        // Fetch current status
+        const st = await fetch('/api/nozzle/status').then(res => res.json());
+        updateNozzleUI(st);
+    } catch (e) {
+        console.error('Nozzle config load error', e);
+    }
+}
+
+async function saveNozzleConfig() {
+    const data = {
+        serial_port: $('nzPort') ? $('nzPort').value : '',
+        steps_per_rev_base: parseInt($('nzCfgStepsRev')?.value) || 200,
+        microstepping: parseInt($('nzCfgMicrostep')?.value) || 16,
+        min_angle: parseFloat($('nzCfgMinAngle')?.value) || -180,
+        max_angle: parseFloat($('nzCfgMaxAngle')?.value) || 180,
+        normal_speed_us: parseInt($('nzCfgNormalSpeed')?.value) || 400,
+        homing_speed_us: parseInt($('nzCfgHomingSpeed')?.value) || 2000,
+        accel_steps: parseInt($('nzCfgAccelSteps')?.value) || 200,
+        accel_start_us: parseInt($('nzCfgAccelStart')?.value) || 2000,
+        limit_pin: parseInt($('nzCfgLimitPin')?.value) || 9,
+        analog_pin: parseInt($('nzCfgAnalogPin')?.value) || 1,
+        homing_dir: parseInt($('nzCfgHomingDir')?.value) || 1,
+        homing_back_dir: parseInt($('nzCfgBackDir')?.value) || 0,
+        known_resistance: parseInt($('nzCfgKnownR')?.value) || 10000,
+        adc_sample_count: parseInt($('nzCfgAdcSamples')?.value) || 20,
+        diode_threshold: parseInt($('nzCfgDiodeThreshold')?.value) || 500,
+        test_count: parseInt($('nzCfgTestCount')?.value) || 10,
+        test_interval: parseFloat($('nzCfgTestInterval')?.value) || 1.0,
+    };
+
+    const r = await api('/api/nozzle/config', data);
+    showToast(r.message, r.success ? 'info' : 'error');
+}
+
+// Init Nozzle
+loadNozzleConfig();

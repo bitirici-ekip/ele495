@@ -28,6 +28,7 @@
             <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Ayarlar</button>
             <button class="tab-btn" data-tab="bases" onclick="switchTab('bases')">📍 Konumlar</button>
             <button class="tab-btn" data-tab="scenarios" onclick="switchTab('scenarios')">🎬 Senaryolar</button>
+            <button class="tab-btn" data-tab="nozzle" onclick="switchTab('nozzle')">🔧 Nozzle</button>
             <button class="tab-btn" data-tab="verification" onclick="switchTab('verification')">👁️ Doğrulama</button>
         </div>
         <div class="h-right">
@@ -118,6 +119,19 @@
                         </select>
                         <button class="btn btn-p ripple" onclick="quickGotoBaseMain()"
                             style="padding:0 10px; font-size:0.75rem; height:26px; line-height:1; display:flex; align-items:center; justify-content:center; width:auto; flex:0 0 auto; font-weight:bold">GİT</button>
+                    </div>
+                </div>
+
+                <!-- Quick Measurement Panel -->
+                <div class="card" style="width:100%; display:flex; flex-direction:column; margin-bottom:10px">
+                    <div class="card-h"><span class="card-t">⚡ Hızlı Ölçüm</span></div>
+                    <div class="card-b" style="padding:6px; display:flex; gap:4px">
+                        <button class="btn ripple" onclick="quickReadResistance()"
+                            style="flex:1; padding:6px; font-size:0.75rem; font-weight:bold; background:linear-gradient(135deg,#1a472a,#2d6a4f); color:#fff; border:none; border-radius:6px; cursor:pointer">🔬
+                            Direnç</button>
+                        <button class="btn ripple" onclick="quickReadDiode()"
+                            style="flex:1; padding:6px; font-size:0.75rem; font-weight:bold; background:linear-gradient(135deg,#4a1942,#6b2fa0); color:#fff; border:none; border-radius:6px; cursor:pointer">💡
+                            Diyot</button>
                     </div>
                 </div>
 
@@ -215,6 +229,32 @@
                     </div>
                 </div>
                 <div id="camOverlayText" class="cam-overlay-text"></div>
+
+                <!-- Quick Measurement Result HUD (below camera) -->
+                <div id="quickMeasurementHUD" style="display:none; margin-top:10px">
+                    <div style="display:flex; gap:8px">
+                        <div id="qmResBox"
+                            style="flex:1; background:linear-gradient(135deg,#0a1a0f,#112a18); border:1px solid rgba(76,175,80,0.3); border-radius:8px; padding:8px 12px; display:none">
+                            <div
+                                style="font-size:0.65rem; color:#4caf50; font-weight:600; text-transform:uppercase; margin-bottom:2px">
+                                🔬 Direnç</div>
+                            <div id="qmResValue"
+                                style="font-size:1.1rem; font-weight:800; color:#66bb6a; font-family:'JetBrains Mono',monospace">
+                                --</div>
+                            <div id="qmResDetail" style="font-size:0.6rem; color:#555">ADC: -- | V: --</div>
+                        </div>
+                        <div id="qmDiodeBox"
+                            style="flex:1; background:linear-gradient(135deg,#1a0a1a,#2a112a); border:1px solid rgba(156,39,176,0.3); border-radius:8px; padding:8px 12px; display:none">
+                            <div
+                                style="font-size:0.65rem; color:#ce93d8; font-weight:600; text-transform:uppercase; margin-bottom:2px">
+                                💡 Diyot</div>
+                            <div id="qmDiodeValue"
+                                style="font-size:0.9rem; font-weight:800; font-family:'JetBrains Mono',monospace; white-space:nowrap">
+                                --</div>
+                            <div id="qmDiodeDetail" style="font-size:0.6rem; color:#555">ADC: -- | Eşik: --</div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="ctrl-right">
                 <!-- KOORDİNATLAR -->
@@ -751,8 +791,8 @@
                 <div class="card">
                     <div class="card-h"><span class="card-t">Oluştur / Düzenle</span>
                         <button class="btn btn-sm ripple"
-                            style="background:var(--blue); color:#fff; display:flex; align-items:center; gap:4px"
-                            onclick="pasteScenarioFromClipboard()">📋 Pano'dan Yapıştır</button>
+                            style="background:#4caf50; color:#fff; display:flex; align-items:center; gap:4px"
+                            onclick="createNewScenario()">➕ Yeni Senaryo Ekle</button>
                     </div>
                     <div class="card-b">
                         <div class="cfg-r"><label>Senaryo Adı</label><input type="text" class="cfg-in" id="scenarioName"
@@ -772,6 +812,10 @@
                                     <option value="delay">⏳ Bekle</option>
                                     <option value="move_z">↕️ Z Konumuna Git</option>
                                     <option value="home">🏠 Home</option>
+                                    <option value="resistance_test">🔬 Direnç Testi</option>
+                                    <option value="diode_test">💡 Diyot Testi</option>
+                                    <option value="nozzle_goto">🔄 Nozzle Açıya Git</option>
+                                    <option value="nozzle_home">🏠 Nozzle Home</option>
                                 </select>
                             </div>
                             <div id="stepParamBox" style="flex:1; min-width:120px">
@@ -858,6 +902,510 @@
                 </div>
             </div>
 
+        </div>
+    </main>
+
+    <!-- ══════ TAB: NOZZLE ══════ -->
+    <main class="tab-content" id="tab-nozzle">
+        <style>
+            .nz-dashboard {
+                display: grid;
+                grid-template-columns: 320px 1fr 310px;
+                gap: 12px;
+                padding: 14px;
+                height: calc(100vh - 75px);
+                overflow: hidden;
+            }
+
+            .nz-col {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                overflow-y: auto;
+                max-height: 100%;
+            }
+
+            .nz-col::-webkit-scrollbar {
+                width: 4px;
+            }
+
+            .nz-col::-webkit-scrollbar-thumb {
+                background: #444;
+                border-radius: 4px;
+            }
+
+            /* Angle Display */
+            .nz-angle-display {
+                background: linear-gradient(135deg, #0a0e1a 0%, #111827 100%);
+                border-radius: 16px;
+                padding: 18px;
+                border: 1px solid rgba(59, 130, 246, 0.2);
+                text-align: center;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .nz-angle-display::before {
+                content: '';
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: radial-gradient(circle at center, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+                animation: nzPulse 4s ease-in-out infinite;
+            }
+
+            @keyframes nzPulse {
+
+                0%,
+                100% {
+                    opacity: 0.5;
+                }
+
+                50% {
+                    opacity: 1;
+                }
+            }
+
+            .nz-big-angle {
+                font-size: 3rem;
+                font-weight: 800;
+                color: var(--blue);
+                text-align: center;
+                line-height: 1;
+                font-family: 'JetBrains Mono', monospace;
+                position: relative;
+                z-index: 1;
+            }
+
+            .nz-unit {
+                font-size: 1rem;
+                color: #888;
+                font-weight: 400
+            }
+
+            .nz-status-dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                display: inline-block;
+                transition: all .3s;
+            }
+
+            .nz-status-dot.on {
+                background: #4caf50;
+                box-shadow: 0 0 8px #4caf50
+            }
+
+            .nz-status-dot.off {
+                background: #f44336;
+                box-shadow: 0 0 8px #f44336
+            }
+
+            /* Rotation Buttons */
+            .nz-rot-btn {
+                padding: 7px 0;
+                font-size: 0.78rem;
+                font-weight: 700;
+                border: 1px solid #333;
+                background: rgba(255, 255, 255, 0.04);
+                color: #ccc;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: all .2s;
+                flex: 1;
+                text-align: center;
+            }
+
+            .nz-rot-btn:hover {
+                background: rgba(59, 130, 246, 0.1);
+                border-color: var(--blue);
+                color: var(--blue);
+                transform: translateY(-1px);
+            }
+
+            /* Measurement Cards */
+            .nz-measure-panel {
+                background: linear-gradient(135deg, #0a0e1a 0%, #111420 100%);
+                border-radius: 12px;
+                padding: 14px;
+                border: 1px solid #222;
+                text-align: center;
+            }
+
+            .nz-measure-val {
+                font-size: 1.8rem;
+                font-weight: 800;
+                color: var(--green);
+                text-align: center;
+                font-family: 'JetBrains Mono', monospace;
+                line-height: 1.2;
+            }
+
+            .nz-measure-sub {
+                font-size: 0.72rem;
+                color: #666;
+                text-align: center;
+                margin-top: 3px;
+            }
+
+            /* Test Progress */
+            .nz-test-progress {
+                display: flex;
+                gap: 3px;
+                margin: 6px 0;
+                flex-wrap: wrap;
+            }
+
+            .nz-test-dot {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: #222;
+                border: 1px solid #444;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.55rem;
+                font-weight: bold;
+                transition: all .3s;
+            }
+
+            .nz-test-dot.pass {
+                background: #4caf50;
+                border-color: #66bb6a;
+                color: #fff
+            }
+
+            .nz-test-dot.fail {
+                background: #f44336;
+                border-color: #ef5350;
+                color: #fff
+            }
+
+            .nz-test-dot.active {
+                border-color: var(--blue);
+                box-shadow: 0 0 8px var(--blue)
+            }
+
+            /* Decision Badge */
+            .nz-decision {
+                font-size: 1.1rem;
+                font-weight: 800;
+                text-align: center;
+                padding: 8px;
+                border-radius: 8px;
+                margin-top: 6px;
+            }
+
+            .nz-decision.pass {
+                background: rgba(76, 175, 80, .12);
+                color: #4caf50;
+                border: 1px solid rgba(76, 175, 80, .4)
+            }
+
+            .nz-decision.fail {
+                background: rgba(244, 67, 54, .12);
+                color: #f44336;
+                border: 1px solid rgba(244, 67, 54, .4)
+            }
+
+            /* Detail Table */
+            .nz-detail-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.72rem;
+                margin-top: 6px;
+            }
+
+            .nz-detail-table th {
+                background: rgba(255, 255, 255, 0.04);
+                color: #888;
+                padding: 4px 6px;
+                text-align: center;
+                font-weight: 600;
+                border-bottom: 1px solid #333;
+            }
+
+            .nz-detail-table td {
+                padding: 3px 6px;
+                text-align: center;
+                color: #ccc;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            }
+
+            .nz-detail-table tr:hover td {
+                background: rgba(255, 255, 255, 0.02);
+            }
+
+            .nz-stat-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 6px;
+                margin-top: 6px;
+            }
+
+            .nz-stat-box {
+                background: rgba(255, 255, 255, 0.03);
+                border-radius: 6px;
+                padding: 6px;
+                text-align: center;
+                border: 1px solid #222;
+            }
+
+            .nz-stat-label {
+                font-size: 0.6rem;
+                color: #666;
+                text-transform: uppercase;
+                font-weight: 600;
+            }
+
+            .nz-stat-value {
+                font-size: 0.85rem;
+                font-weight: 700;
+                color: var(--blue);
+                font-family: 'JetBrains Mono', monospace;
+            }
+
+            /* Settings Column */
+            .nz-settings-section {
+                font-size: 0.68rem;
+                color: #666;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                margin: 8px 0 4px;
+                padding-bottom: 3px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            }
+
+            .nz-cfg-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 3px 0;
+                gap: 6px;
+                font-size: 0.78rem;
+            }
+
+            .nz-cfg-row label {
+                color: #aaa;
+                flex: 1;
+                white-space: nowrap;
+            }
+
+            .nz-cfg-row input,
+            .nz-cfg-row select {
+                background: #111;
+                border: 1px solid #333;
+                color: #fff;
+                border-radius: 4px;
+                padding: 3px 6px;
+                font-size: 0.75rem;
+                font-family: 'JetBrains Mono', monospace;
+                text-align: center;
+            }
+
+            .nz-cfg-row input[type=number] {
+                width: 65px;
+            }
+
+            .nz-cfg-row select {
+                width: 65px;
+            }
+        </style>
+
+        <div class="nz-dashboard">
+            <!-- ═══ LEFT COLUMN: Connection + Motor ═══ -->
+            <div class="nz-col">
+                <!-- BAĞLANTI -->
+                <div class="card" style="margin:0;flex-shrink:0">
+                    <div class="card-h"><span class="card-t">🔌 Bağlantı</span>
+                        <span id="nzStatusDot" class="nz-status-dot off"></span>
+                    </div>
+                    <div class="card-b" style="padding:10px">
+                        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+                            <label style="font-size:0.75rem;color:#888;white-space:nowrap">Port</label>
+                            <input type="text" class="cfg-in" id="nzPort" value="/dev/arduino_slave"
+                                style="flex:1;font-family:'JetBrains Mono';font-size:0.75rem;padding:5px 8px">
+                        </div>
+                        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+                            <label style="font-size:0.75rem;color:#888;white-space:nowrap">Durum</label>
+                            <span class="mono" id="nzConnStatus"
+                                style="color:#f44336;font-weight:bold;font-size:0.8rem">Bağlı Değil</span>
+                        </div>
+                        <div style="display:flex;gap:6px">
+                            <button class="btn btn-g ripple"
+                                style="flex:1;padding:8px;font-weight:bold;font-size:0.82rem"
+                                onclick="nozzleConnect()">🔌 Bağlan</button>
+                            <button class="btn btn-d ripple"
+                                style="flex:1;padding:8px;font-weight:bold;font-size:0.82rem"
+                                onclick="nozzleDisconnect()">⛔ Kopar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MOTOR KONTROL -->
+                <div class="card" style="margin:0;flex:1">
+                    <div class="card-h"><span class="card-t">🔄 Motor Kontrol</span></div>
+                    <div class="card-b" style="padding:10px">
+                        <div class="nz-angle-display" style="margin-bottom:10px">
+                            <div class="nz-big-angle" id="nzAngle">0.0<span class="nz-unit">°</span></div>
+                            <div style="margin-top:6px">
+                                <span id="nzHomedBadge"
+                                    style="background:#f44336;color:#fff;padding:2px 10px;border-radius:10px;font-weight:bold;font-size:0.7rem">HOME
+                                    YOK</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-y ripple"
+                            style="width:100%;padding:8px;font-weight:bold;margin-bottom:8px;font-size:0.85rem"
+                            onclick="nozzleHome()">🏠 Home</button>
+                        <div style="display:flex;gap:6px;margin-bottom:10px">
+                            <input type="number" class="cfg-in" id="nzTargetAngle" placeholder="Açı (°)" value="0"
+                                style="flex:1;text-align:center;font-size:1rem;height:36px">
+                            <button class="btn btn-p ripple" style="flex:0 0 70px;font-weight:bold;font-size:0.85rem"
+                                onclick="nozzleGoto()">GİT</button>
+                        </div>
+                        <div style="font-size:0.68rem;color:#666;margin-bottom:4px;font-weight:600">HIZLI DÖNDÜRME</div>
+                        <div style="display:flex;gap:3px;margin-bottom:3px">
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(-180)">-180°</button>
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(-90)">-90°</button>
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(-45)">-45°</button>
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(-15)">-15°</button>
+                        </div>
+                        <div style="display:flex;gap:3px">
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(15)">+15°</button>
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(45)">+45°</button>
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(90)">+90°</button>
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(180)">+180°</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ CENTER COLUMN: Direnç + Diyot Measurement ═══ -->
+            <div class="nz-col">
+                <!-- DİRENÇ ÖLÇÜMÜ -->
+                <div class="card" style="margin:0;flex:1">
+                    <div class="card-h"><span class="card-t">🔬 Direnç Ölçümü</span></div>
+                    <div class="card-b" style="padding:10px">
+                        <div class="nz-measure-panel" style="margin-bottom:8px">
+                            <div class="nz-measure-val" id="nzResValue">--</div>
+                            <div class="nz-measure-sub" id="nzResDetails">ADC: -- | V: -- | Durum: --</div>
+                        </div>
+                        <button class="btn btn-c ripple"
+                            style="width:100%;padding:8px;font-weight:bold;margin-bottom:8px;font-size:0.82rem"
+                            onclick="nozzleReadResistance()">⚡ Anlık Ölçüm</button>
+                        <div style="border-top:1px solid #222;padding-top:8px">
+                            <div
+                                style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                                <span style="font-size:0.72rem;color:#aaa;font-weight:600">TEKRARLI TEST</span>
+                                <span style="font-size:0.65rem;color:#555">10 ölçüm → istatistik</span>
+                            </div>
+                            <div class="nz-test-progress" id="nzResProgress"></div>
+                            <div id="nzResTestResult" style="display:none"></div>
+                            <button class="btn btn-p ripple"
+                                style="width:100%;padding:8px;font-weight:bold;font-size:0.82rem"
+                                onclick="nozzleResistanceTest()">🔬 Tekrarlı Direnç Testi Başlat</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DİYOT TESTİ -->
+                <div class="card" style="margin:0;flex:1">
+                    <div class="card-h"><span class="card-t">💡 Diyot Testi</span></div>
+                    <div class="card-b" style="padding:10px">
+                        <div class="nz-measure-panel" style="margin-bottom:8px">
+                            <div class="nz-measure-val" id="nzDiodeValue" style="font-size:1.4rem">--</div>
+                            <div class="nz-measure-sub" id="nzDiodeDetails">ADC: -- | Eşik: --</div>
+                        </div>
+                        <button class="btn btn-c ripple"
+                            style="width:100%;padding:8px;font-weight:bold;margin-bottom:8px;font-size:0.82rem"
+                            onclick="nozzleReadDiode()">⚡ Anlık Test</button>
+                        <div style="border-top:1px solid #222;padding-top:8px">
+                            <div
+                                style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                                <span style="font-size:0.72rem;color:#aaa;font-weight:600">TEKRARLI TEST</span>
+                                <span style="font-size:0.65rem;color:#555">10 ölçüm → çoğunluk kararı</span>
+                            </div>
+                            <div class="nz-test-progress" id="nzDiodeProgress"></div>
+                            <div id="nzDiodeTestResult" style="display:none"></div>
+                            <div style="display:flex;align-items:center;gap:8px;margin:6px 0">
+                                <label style="font-size:0.75rem;color:#aaa;flex:1">Otomatik Düzeltme (180° dön)</label>
+                                <input type="checkbox" id="nzAutoCorrect" checked
+                                    style="width:16px;height:16px;accent-color:var(--blue)">
+                            </div>
+                            <button class="btn btn-p ripple"
+                                style="width:100%;padding:8px;font-weight:bold;font-size:0.82rem"
+                                onclick="nozzleDiodeTest()">💡 Tekrarlı Diyot Testi Başlat</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ RIGHT COLUMN: Settings ═══ -->
+            <div class="nz-col">
+                <div class="card" style="margin:0;flex:1">
+                    <div class="card-h"><span class="card-t">⚙️ Nozzle Ayarları</span></div>
+                    <div class="card-b" style="padding:10px">
+                        <div class="nz-settings-section">Motor Parametreleri</div>
+                        <div class="nz-cfg-row"><label>Adım/Devir</label><input type="number" id="nzCfgStepsRev"
+                                value="200"></div>
+                        <div class="nz-cfg-row"><label>Mikro Adımlama</label>
+                            <select id="nzCfgMicrostep">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="4">4</option>
+                                <option value="8">8</option>
+                                <option value="16" selected>16</option>
+                            </select>
+                        </div>
+                        <div class="nz-cfg-row"><label>Min Açı (°)</label><input type="number" id="nzCfgMinAngle"
+                                value="-180"></div>
+                        <div class="nz-cfg-row"><label>Max Açı (°)</label><input type="number" id="nzCfgMaxAngle"
+                                value="180"></div>
+
+                        <div class="nz-settings-section">Hız (µs/adım)</div>
+                        <div class="nz-cfg-row"><label>Normal Hız</label><input type="number" id="nzCfgNormalSpeed"
+                                value="400"></div>
+                        <div class="nz-cfg-row"><label>Homing Hızı</label><input type="number" id="nzCfgHomingSpeed"
+                                value="2000"></div>
+                        <div class="nz-cfg-row"><label>İvme Adım</label><input type="number" id="nzCfgAccelSteps"
+                                value="200"></div>
+                        <div class="nz-cfg-row"><label>İvme Başlangıç</label><input type="number" id="nzCfgAccelStart"
+                                value="2000"></div>
+
+                        <div class="nz-settings-section">Pinler</div>
+                        <div class="nz-cfg-row"><label>Limit Switch</label><input type="number" id="nzCfgLimitPin"
+                                value="9" style="width:50px"></div>
+                        <div class="nz-cfg-row"><label>Analog Pin</label><input type="number" id="nzCfgAnalogPin"
+                                value="1" style="width:50px"></div>
+                        <div class="nz-cfg-row"><label>Homing Yönü</label><input type="number" id="nzCfgHomingDir"
+                                value="1" min="0" max="1" style="width:50px"></div>
+                        <div class="nz-cfg-row"><label>Geri Yön</label><input type="number" id="nzCfgBackDir" value="0"
+                                min="0" max="1" style="width:50px"></div>
+
+                        <div class="nz-settings-section">Ölçüm Parametreleri</div>
+                        <div class="nz-cfg-row"><label>Bilinen R (Ω)</label><input type="number" id="nzCfgKnownR"
+                                value="10000" style="width:75px"></div>
+                        <div class="nz-cfg-row"><label>ADC Örnekleme</label><input type="number" id="nzCfgAdcSamples"
+                                value="20" style="width:50px"></div>
+                        <div class="nz-cfg-row"><label>Diyot Eşik</label><input type="number" id="nzCfgDiodeThreshold"
+                                value="500" style="width:70px"></div>
+                        <div class="nz-cfg-row"><label>Test Sayısı</label><input type="number" id="nzCfgTestCount"
+                                value="10" style="width:50px"></div>
+                        <div class="nz-cfg-row"><label>Test Aralığı (sn)</label><input type="number" step="0.1"
+                                id="nzCfgTestInterval" value="1.0" style="width:55px"></div>
+
+                        <div style="margin-top:10px;padding-top:8px;border-top:1px solid #222">
+                            <button class="btn btn-p ripple"
+                                style="width:100%;padding:8px;font-size:0.8rem;font-weight:bold"
+                                onclick="saveNozzleConfig()">💾 Ayarları Kaydet</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
