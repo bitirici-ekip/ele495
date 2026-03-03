@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>PNP Kontrol Merkezi</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="h-brand">
+            <div class="h-logo">P</div>
+            <div>
+                <div class="h-title">PNP Kontrol Merkezi</div>
+                <div class="h-sub">Pick & Place CNC v2.0</div>
+            </div>
+        </div>
+        <div class="h-center">
+            <button class="tab-btn active" data-tab="control" onclick="switchTab('control')">🎮 Kontrol</button>
+            <button class="tab-btn" data-tab="calibration" onclick="switchTab('calibration')">🔧 Kalibrasyon</button>
+            <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Ayarlar</button>
+            <button class="tab-btn" data-tab="bases" onclick="switchTab('bases')">📍 Konumlar</button>
+            <button class="tab-btn" data-tab="scenarios" onclick="switchTab('scenarios')">🎬 Senaryolar</button>
+            <button class="tab-btn" data-tab="nozzle" onclick="switchTab('nozzle')">🔧 Nozzle</button>
+            <button class="tab-btn" data-tab="verification" onclick="switchTab('verification')">👁️ Doğrulama</button>
+        </div>
+        <div class="h-right">
+            <div class="badge ok" id="motorBadge"><span class="dot"></span><span id="motorBadgeTxt">Motor</span></div>
+            <div class="grbl-badge idle" id="grblBadge">IDLE</div>
+            <span class="uptime" id="uptimeEl">⏱ 00:00:00</span>
+            <button class="theme-btn" onclick="toggleTheme()" title="Tema">🌓</button>
+            <a href="/logout" class="logout-btn">Çıkış</a>
+        </div>
+    </header>
+    <!-- ALARM BAR -->
+    <div class="alarm-bar" id="alarmBar">⚠️ ALARM — Makine kilitli!
+        <button onclick="unlockGrbl()">🔓 Unlock ($X)</button><button onclick="softReset()">🔄 Reset</button>
+    </div>
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastBox"></div>
+
+    <!-- ══════ TAB: KONTROL ══════ -->
+    <main class="tab-content active" id="tab-control">
+        <div class="ctrl-layout">
+            <!-- LEFT: CONSOLE -->
+            <div class="ctrl-console-col">
+                <!-- Quick Scenario Launcher -->
+                <div class="card" style="width:100%; display:flex; flex-direction:column; margin-bottom:10px">
+
+                    <div class="card-b" style="padding:6px; display:flex; flex-direction:column; gap:4px">
+                        <div style="display:flex; gap:4px">
+                            <select id="quickScenarioSel" class="cam-inp"
+                                style="flex:1; height:26px; font-size:0.75rem">
+                                <option value="">Senaryo seç...</option>
+                            </select>
+                            <button id="quickScenarioRunBtn" class="btn btn-p ripple" onclick="quickRunScenario()"
+                                style="padding:0 8px; font-size:0.75rem; height:26px; line-height:1; display:flex; align-items:center; justify-content:center; width:auto; flex:0 0 auto; font-weight:bold"
+                                title="Başlat">▶</button>
+                        </div>
+                        <div style="display:flex; gap:4px; margin-top:2px;">
+                            <select id="quickMasterScenarioSel" class="cam-inp"
+                                style="flex:1; height:26px; font-size:0.75rem; border-color:var(--yellow); color:var(--yellow)">
+                                <option value="">👑 Master Senaryo seç...</option>
+                            </select>
+                            <button id="quickMasterScenarioRunBtn" class="btn btn-p ripple"
+                                onclick="quickRunMasterScenario()"
+                                style="padding:0 8px; font-size:0.75rem; height:26px; line-height:1; display:flex; align-items:center; justify-content:center; width:auto; flex:0 0 auto; font-weight:bold; background-color:var(--yellow); color:#000;"
+                                title="Başlat">▶</button>
+                        </div>
+                        <button id="quickScenarioStopBtn" class="btn btn-d ripple" onclick="stopScenario()"
+                            style="padding:6px; display:none">⏹ Durdur</button>
+                        <div id="scenarioStatusBox"
+                            style="background:rgba(0,0,0,0.3); border-radius:4px; padding:6px; max-height:60px; overflow-y:auto; font-family:'JetBrains Mono'; font-size:0.7rem; display:none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Center Panel (Restored) -->
+                <div class="card" style="width:100%; display:flex; flex-direction:column; margin-bottom:10px">
+
+                    <div class="card-b" style="padding:6px; display:flex; gap:4px">
+                        <input type="text" id="targetInput" list="ocrWordsList" class="cam-inp" placeholder="Kelime..."
+                            style="flex:1; text-transform:uppercase; height:26px; font-size:0.75rem"
+                            onkeydown="if(event.key==='Enter')startAutoCenter()">
+                        <datalist id="ocrWordsList"></datalist>
+                        <button class="btn btn-p ripple" onclick="startAutoCenter()"
+                            style="padding:0 10px; font-size:0.75rem; height:26px; line-height:1; display:flex; align-items:center; justify-content:center; width:auto; flex:0 0 auto; font-weight:bold">GİT</button>
+                    </div>
+                    <div class="card-b" style="padding:0 6px 6px 6px; display:flex; gap:4px; overflow-x:auto">
+                        <button class="btn btn-sm ripple" style="padding:2px 6px; flex:1"
+                            onclick="setInputAndCenter('TEST')">TEST</button>
+                        <button class="btn btn-sm ripple" style="padding:2px 6px; flex:1"
+                            onclick="setInputAndCenter('CRB')">CRB</button>
+                        <button class="btn btn-sm ripple" style="padding:2px 6px; flex:1"
+                            onclick="setInputAndCenter('SHN')">SHN</button>
+                        <button class="btn btn-sm ripple" style="padding:2px 6px; flex:1"
+                            onclick="setInputAndCenter('AYD')">AYD</button>
+                        <button class="btn btn-sm ripple" style="padding:2px 6px; flex:1"
+                            onclick="setInputAndCenter('MUS')">MUS</button>
+                    </div>
+                    <div id="acStatusBox"
+                        style="background:rgba(0,0,0,0.3); border-radius:4px; padding:6px; margin:0 10px 10px 10px; max-height:60px; overflow-y:auto; font-family:'JetBrains Mono'; font-size:0.7rem; display:none">
+                    </div>
+                </div>
+
+                <!-- Quick Go To Base Panel -->
+                <div class="card" style="width:100%; display:flex; flex-direction:column; margin-bottom:10px">
+
+                    <div class="card-b" style="padding:6px; display:flex; gap:4px">
+                        <select id="quickBaseSelMain" class="cam-inp" style="flex:1; height:26px; font-size:0.75rem">
+                            <option value="">Konum seç...</option>
+                        </select>
+                        <button class="btn btn-p ripple" onclick="quickGotoBaseMain()"
+                            style="padding:0 10px; font-size:0.75rem; height:26px; line-height:1; display:flex; align-items:center; justify-content:center; width:auto; flex:0 0 auto; font-weight:bold">GİT</button>
+                    </div>
+                </div>
+
+                <!-- Quick Measurement Panel -->
+                <div class="card" style="width:100%; display:flex; flex-direction:column; margin-bottom:10px">
+
+                    <div class="card-b" style="padding:6px; display:flex; gap:4px">
+                        <button class="btn ripple" onclick="quickReadResistance()"
+                            style="flex:1; padding:6px; font-size:0.75rem; font-weight:bold; background:linear-gradient(135deg,#1a472a,#2d6a4f); color:#fff; border:none; border-radius:6px; cursor:pointer">🔬
+                            Direnç</button>
+                        <button class="btn ripple" onclick="quickReadDiode()"
+                            style="flex:1; padding:6px; font-size:0.75rem; font-weight:bold; background:linear-gradient(135deg,#4a1942,#6b2fa0); color:#fff; border:none; border-radius:6px; cursor:pointer">💡
+                            Diyot</button>
+                    </div>
+                </div>
+
+                <!-- Console -->
+                <div class="card console-card"
+                    style="width:100%; height:40%; display:flex; flex-direction:column; margin-bottom:10px">
+                    <div class="card-h"><span class="card-t">📋 Konsol</span>
+                        <button class="btn-sm" onclick="clearConsole()">Temizle</button>
+                    </div>
+                    <div class="card-b console-body" style="flex:1; min-height:0; overflow:hidden">
+                        <div class="console-box" id="console" style="flex:1; overflow-y:auto; min-height:0">
+                            <div class="cline info"><span class="ct">[--:--:--]</span> Bağlanıyor...</div>
+                        </div>
+                        <div class="gcode-row"><input class="gcode-in" id="gcodeIn" placeholder="G-code komutu..."
+                                onkeydown="if(event.key==='Enter')sendGcode()"><button class="gcode-btn"
+                                onclick="sendGcode()">▶</button></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- CENTER: CAMERA -->
+            <div class="ctrl-left">
+                <!-- Verification HUD (Ana ekranda sonuçları hızlıca görmek için) -->
+                <div id="verificationResultsHUD"
+                    style="display:flex; gap:8px; margin-bottom:10px; overflow-x:auto; padding-bottom:4px"></div>
+
+                <div class="cam-wrap" id="camWrap">
+                    <img id="camFeed" src="/video_feed" alt="Kamera">
+                    <!-- Overlays -->
+                    <!-- TOP LEFT: Stats -->
+                    <div class="cam-stats" id="camStats" style="font-size:1.1rem; font-weight:600">
+                        <div class="stat-item">CAM: <span id="fpsCam">--</span> FPS</div>
+                        <div class="stat-item">OCR: <span id="fpsOcr">--</span> FPS</div>
+                    </div>
+
+                    <!-- TOP RIGHT: Live Status -->
+                    <div class="cam-live-badge">LIVE</div>
+
+                    <!-- BOTTOM RIGHT: Settings & Resolution -->
+                    <div class="cam-bottom-right">
+                        <button class="cam-set-btn ripple" onclick="toggleCamSettings()"
+                            title="Çözünürlük Ayarları">⚙️</button>
+                        <div class="cam-res-badge" id="camResBadge">--×--</div>
+                    </div>
+
+                    <!-- PIP Zoom Slider -->
+                    <div class="cam-controls"
+                        style="position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.6); padding:5px 15px; border-radius:20px; display:flex; gap:10px; align-items:center; z-index:100; pointer-events:auto">
+                        <span style="color:#fff; font-size:0.8rem; font-weight:bold">PIP ZOOM</span>
+                        <input type="range" id="zoomSlider" min="1.0" max="10.0" step="0.1" value="2.0"
+                            style="width:100px; cursor:pointer" oninput="setZoom(this.value)">
+                        <span id="zoomVal" style="color:#ffeb3b; font-size:0.8rem; min-width:30px">x2.0</span>
+                    </div>
+
+                    <!-- Settings Overlay -->
+                    <div class="cam-settings" id="camSettings">
+                        <div class="cam-set-h">Kamera & Yayın Ayarları</div>
+
+                        <!-- Presets -->
+                        <div class="cam-presets">
+                            <button class="btn-sm" onclick="setRes(640,480)">640x480</button>
+                            <button class="btn-sm" onclick="setRes(800,600)">800x600</button>
+                            <button class="btn-sm" onclick="setRes(1280,720)">720p</button>
+                            <button class="btn-sm" onclick="setRes(800,1080)">800x1080</button>
+                            <button class="btn-sm" onclick="setRes(1920,1080)">1080p</button>
+                        </div>
+
+                        <div class="sep" style="margin:8px 0"></div>
+
+                        <!-- Capture Resolution -->
+                        <div style="font-size:0.7rem; color:#aaa; margin-bottom:4px">YAKALAMA (OCR)</div>
+                        <div class="cam-set-row">
+                            <input type="number" class="cam-inp" id="camW" value="800" placeholder="W">
+                            <span class="cam-x">×</span>
+                            <input type="number" class="cam-inp" id="camH" value="1080" placeholder="H">
+                        </div>
+
+                        <!-- Stream Resolution -->
+                        <div style="font-size:0.7rem; color:#aaa; margin:8px 0 4px 0">YAYIN (EKRAN)</div>
+                        <!-- Stream Presets -->
+                        <div class="cam-presets" style="margin-bottom:6px">
+                            <button class="btn-sm" onclick="setStreamRes(300, this)">Düşük</button>
+                            <button class="btn-sm" onclick="setStreamRes(500, this)">Orta</button>
+                            <button class="btn-sm" onclick="setStreamRes(800, this)">Yüksek</button>
+                        </div>
+                        <div class="cam-set-row">
+                            <input type="number" class="cam-inp" id="streamW" value="800" placeholder="Genişlik (px)">
+                            <span style="font-size:0.7rem; color:#666; margin-left:4px">px</span>
+                        </div>
+
+                        <button class="btn btn-p ripple"
+                            style="padding:6px 12px;font-size:0.75rem;width:100%;margin-top:12px"
+                            onclick="applyCamRes()">Uygula & Yeniden Başlat</button>
+                    </div>
+                </div>
+                <div id="camOverlayText" class="cam-overlay-text"></div>
+
+                <!-- Scenario Test Result Banner (büyük ve belirgin PASS/FAIL) -->
+                <div id="scenarioTestBanner" style="
+                    display:none;
+                    position:fixed;
+                    top:50%;
+                    left:50%;
+                    transform:translate(-50%,-50%);
+                    z-index:9999;
+                    padding:30px 60px;
+                    border-radius:20px;
+                    font-size:2.5rem;
+                    font-weight:900;
+                    font-family:'Inter','JetBrains Mono',monospace;
+                    text-align:center;
+                    pointer-events:none;
+                    animation:bannerPop 0.4s ease;
+                    box-shadow:0 8px 40px rgba(0,0,0,0.6);
+                    min-width:400px;
+                ">
+                    <div id="scenarioTestBannerIcon" style="font-size:4rem; margin-bottom:8px"></div>
+                    <div id="scenarioTestBannerTitle" style="margin-bottom:6px"></div>
+                    <div id="scenarioTestBannerDetail" style="font-size:1rem; font-weight:500; opacity:0.85"></div>
+                </div>
+                <style>
+                    @keyframes bannerPop {
+                        0% { transform: translate(-50%,-50%) scale(0.5); opacity:0; }
+                        60% { transform: translate(-50%,-50%) scale(1.05); opacity:1; }
+                        100% { transform: translate(-50%,-50%) scale(1); opacity:1; }
+                    }
+                </style>
+
+                <!-- Quick Measurement Result HUD (below camera) -->
+                <div id="quickMeasurementHUD" style="display:none; margin-top:10px">
+                    <div style="display:flex; gap:8px">
+                        <div id="qmResBox"
+                            style="flex:1; background:linear-gradient(135deg,#0a1a0f,#112a18); border:1px solid rgba(76,175,80,0.3); border-radius:8px; padding:8px 12px; display:none">
+                            <div
+                                style="font-size:0.65rem; color:#4caf50; font-weight:600; text-transform:uppercase; margin-bottom:2px">
+                                🔬 Direnç</div>
+                            <div id="qmResValue"
+                                style="font-size:1.1rem; font-weight:800; color:#66bb6a; font-family:'JetBrains Mono',monospace">
+                                --</div>
+                            <div id="qmResDetail" style="font-size:0.6rem; color:#555">ADC: -- | V: --</div>
+                        </div>
+                        <div id="qmDiodeBox"
+                            style="flex:1; background:linear-gradient(135deg,#1a0a1a,#2a112a); border:1px solid rgba(156,39,176,0.3); border-radius:8px; padding:8px 12px; display:none">
+                            <div
+                                style="font-size:0.65rem; color:#ce93d8; font-weight:600; text-transform:uppercase; margin-bottom:2px">
+                                💡 Diyot</div>
+                            <div id="qmDiodeValue"
+                                style="font-size:0.9rem; font-weight:800; font-family:'JetBrains Mono',monospace; white-space:nowrap">
+                                --</div>
+                            <div id="qmDiodeDetail" style="font-size:0.6rem; color:#555">ADC: -- | Eşik: --</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="ctrl-right">
+                <!-- KOORDİNATLAR -->
+                <div class="card coord-card">
+                    <div class="card-h"><span class="card-t">📍 Pozisyon</span>
+                    </div>
+                    <div class="coord-grid">
+                        <div class="coord"><span class="cl">X</span><span class="cv" id="posX">0.00</span><span
+                                class="cu">mm</span></div>
+                        <div class="coord"><span class="cl">Y</span><span class="cv" id="posY">0.00</span><span
+                                class="cu">mm</span></div>
+                        <div class="coord"><span class="cl">Z</span><span class="cv" id="posZ">0.00</span><span
+                                class="cu">mm</span></div>
+                    </div>
+                </div>
+                <!-- AKSİYONLAR -->
+                <div class="card">
+                    <div class="card-h"><span class="card-t">⚡ Aksiyonlar</span></div>
+                    <div class="card-b">
+                        <div class="act-col">
+                            <div class="ac-st" id="acSt">
+                                <div class="spinner"></div><span id="acMsg"></span>
+                            </div>
+                            <div class="btn-row"><button class="btn btn-g ripple" onclick="pumpCtl(true)">💨 Pompa
+                                    AÇ</button><button class="btn btn-d ripple" onclick="pumpCtl(false)">🛑 Pompa
+                                    KAPAT</button></div>
+                            <div class="btn-row"><button class="btn btn-y ripple" onclick="unlockGrbl()">🔓
+                                    Unlock</button><button class="btn btn-c ripple" onclick="softReset()">🔄
+                                    Reset</button></div>
+                            <button class="btn btn-w ripple" onclick="shutdownServer()">🔌 SUNUCU KAPAT</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- MOTOR -->
+                <div class="card">
+                    <div class="card-h"><span class="card-t">🎮 Motor Kontrolü</span></div>
+                    <div class="card-b" style="text-align:center">
+                        <div class="motor-area">
+                            <!-- XY Grid: 3x3 with diagonals -->
+                            <div class="xy-grid">
+                                <button class="mbtn ripple" onclick="moveMotor(-1,-1)" title="Sol Yukarı">↖</button>
+                                <button class="mbtn ripple" onclick="moveMotor(0,-1)" title="Yukarı">▲</button>
+                                <button class="mbtn ripple" onclick="moveMotor(1,-1)" title="Sağ Yukarı">↗</button>
+                                <button class="mbtn ripple" onclick="moveMotor(-1,0)" title="Sol">◀</button>
+                                <button class="mbtn mhome ripple" onclick="homeMotor()">HOME</button>
+                                <button class="mbtn ripple" onclick="moveMotor(1,0)" title="Sağ">▶</button>
+                                <button class="mbtn ripple" onclick="moveMotor(-1,1)" title="Sol Aşağı">↙</button>
+                                <button class="mbtn ripple" onclick="moveMotor(0,1)" title="Aşağı">▼</button>
+                                <button class="mbtn ripple" onclick="moveMotor(1,1)" title="Sağ Aşağı">↘</button>
+                            </div>
+                            <!-- Z Axis -->
+                            <div class="z-col">
+                                <span class="z-label">Z</span>
+                                <button class="mbtn zbtn ripple" onclick="moveZ(1)" title="Z Yukarı">▲</button>
+                                <button class="mbtn zbtn ripple" onclick="moveZ(-1)" title="Z Aşağı">▼</button>
+                            </div>
+                        </div>
+                        <div class="step-row"><span class="sl">Adım:</span>
+                            <div class="step-btns">
+                                <button class="sb" onclick="setStep(0.1)">0.1</button>
+                                <button class="sb" onclick="setStep(0.5)">0.5</button>
+                                <button class="sb" onclick="setStep(1)">1.0</button>
+                                <button class="sb active" onclick="setStep(5)">5.0</button>
+                                <button class="sb" onclick="setStep(10)">10</button>
+                                <button class="sb" onclick="setStep(50)">50</button>
+                            </div><span class="sl">mm</span>
+                        </div>
+
+                        <!-- Z Hareketi (Moved here) -->
+                        <div style="margin:8px 10px; border-top:1px solid var(--border); padding-top:8px">
+                            <div class="grp-label" style="font-size:0.75rem; color:#aaa; margin-bottom:4px">Z HAREKETİ
+                            </div>
+                            <div style="display:flex; gap:6px">
+                                <input type="number" id="zTargetInput" class="cam-inp" placeholder="Z" style="flex:1"
+                                    value="-163">
+                                <button class="btn btn-sm ripple" onclick="moveToZ()"
+                                    style="flex:1; background:var(--blue); color:#fff; padding:6px; font-weight:bold">
+                                    İNDİR
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- KONSOL -->
+                <!-- KONSOL REMOVED -->
+            </div>
+        </div>
+    </main>
+
+    <!-- ══════ TAB: KALİBRASYON ══════ -->
+    <main class="tab-content" id="tab-calibration">
+        <div style="display:flex; gap:20px; padding:20px; align-items:flex-start; flex-wrap:wrap">
+
+            <!-- SOL: KAMERA VE SONUÇLAR -->
+            <div style="flex:1; min-width:400px; display:flex; flex-direction:column; gap:20px">
+                <div class="card">
+                    <div class="card-h"><span class="card-t">📷 Kalibrasyon Kamerası</span></div>
+                    <div class="card-b" style="padding:0; position:relative">
+                        <img src="/video_feed" id="mainCam" class="cam-stream" alt="Canlı Kamera"
+                            style="width:100%; display:block; border-radius:0 0 8px 8px">
+                        <div class="cw-crosshair">
+                            <div class="cw-ch cw-ch-h"></div>
+                            <div class="cw-ch cw-ch-v"></div>
+                            <div class="cw-ch-center">✦</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-h"><span class="card-t">🎯 2. Algoritma Sonucu (Otomatik)</span></div>
+                    <div class="card-b"
+                        style="display:flex; gap:10px; background:rgba(0,0,0,0.2); padding:15px; border-radius:8px">
+                        <div
+                            style="flex:1; text-align:center; padding:10px; background:#222; border-radius:6px; border:1px solid #444">
+                            <div style="font-size:0.75rem; color:#aaa; margin-bottom:5px">EKSEN SWAP</div>
+                            <div id="calSwap" style="font-size:1.2rem; font-weight:bold; color:var(--blue)">--</div>
+                        </div>
+                        <div
+                            style="flex:1; text-align:center; padding:10px; background:#222; border-radius:6px; border:1px solid #444">
+                            <div style="font-size:0.75rem; color:#aaa; margin-bottom:5px">EKRAN X TERS</div>
+                            <div id="calNegX" style="font-size:1.2rem; font-weight:bold; color:var(--blue)">--</div>
+                        </div>
+                        <div
+                            style="flex:1; text-align:center; padding:10px; background:#222; border-radius:6px; border:1px solid #444">
+                            <div style="font-size:0.75rem; color:#aaa; margin-bottom:5px">EKRAN Y TERS</div>
+                            <div id="calNegY" style="font-size:1.2rem; font-weight:bold; color:var(--blue)">--</div>
+                        </div>
+                    </div>
+                    <div class="card-b" style="padding-top:0">
+                        <div class="cw-summary" id="calMapText"
+                            style="margin-top:10px; text-align:center; color:var(--green)">Henüz kalibre edilmedi.</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-h"><span class="card-t">📐 3. Pixel/mm Oranı</span></div>
+                    <div class="card-b">
+                        <div style="display:flex; gap:15px">
+                            <div style="flex:1">
+                                <label style="font-size:0.8rem; color:#aaa">X Çarpanı</label>
+                                <input type="number" step="0.001" class="cfg-in" id="calPxX_display" value="0.1"
+                                    readonly
+                                    style="font-size:1.5rem; height:45px; text-align:center; background:#111; color:var(--green)">
+                            </div>
+                            <div style="flex:1">
+                                <label style="font-size:0.8rem; color:#aaa">Y Çarpanı</label>
+                                <input type="number" step="0.001" class="cfg-in" id="calPxY_display" value="0.1"
+                                    readonly
+                                    style="font-size:1.5rem; height:45px; text-align:center; background:#111; color:var(--green)">
+                            </div>
+                        </div>
+                        <button class="btn btn-p ripple"
+                            style="width:100%; margin-top:15px; padding:10px; font-size:1rem; font-weight:bold"
+                            onclick="saveCalibration()">💾 Tüm Kalibrasyonu Kaydet</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SAĞ: TESTLER VE MANUEL AYAR -->
+            <div style="flex:1; min-width:400px; display:flex; flex-direction:column; gap:20px">
+                <style>
+                    .cal-step-title {
+                        font-size: 1.1rem;
+                        font-weight: bold;
+                        border-bottom: 2px solid var(--orange);
+                        padding-bottom: 8px;
+                        margin-bottom: 15px;
+                        color: var(--orange)
+                    }
+
+                    .cw-dir.ripple {
+                        padding: 10px;
+                        font-size: 1rem;
+                        flex: 1;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 5px;
+                        background: #222;
+                        border: 1px solid #444;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        color: #fff
+                    }
+
+                    .cw-dir.ripple:hover {
+                        background: #333;
+                        border-color: var(--orange)
+                    }
+
+                    .cw-dir-icon {
+                        font-size: 1.5rem
+                    }
+                </style>
+                <div class="card">
+                    <div class="card-h"><span class="card-t">🛠️ 1. Motor & Yön Testleri</span></div>
+                    <div class="card-b">
+
+                        <div class="cfg-r"
+                            style="margin-bottom:15px; background:rgba(255,255,255,0.05); padding:10px; border-radius:6px">
+                            <label style="font-weight:bold">Test Adımı Boyutu (Motor)</label>
+                            <div style="display:flex; gap:10px; align-items:center">
+                                <input type="number" class="cfg-in" id="calStep" value="2" step="0.5" min="0.5" max="20"
+                                    style="width:80px; text-align:center">
+                                <select class="cfg-in" id="calStepUnit" style="width:120px">
+                                    <option value="mm">Milimetre (mm)</option>
+                                    <option value="px">Piksel (px)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="cal-step-title">Adım 1A: Motor X+ Testi</div>
+                        <p class="card-desc">Önce butona basıp motorun X+ yönündeki hareketini kameradan izleyin.
+                            Ardından nesnenin ekrandaki <b>hareket yönünü</b> aşağıdaki butonlardan seçin.</p>
+                        <button class="btn btn-p ripple" onclick="calTestMotor('x',1)"
+                            style="margin-bottom:15px; width:100%; padding:10px; font-weight:bold; background:var(--blue)">▶
+                            X+ Yönüne Hareket Ettir</button>
+                        <div id="calPickX" style="display:flex; gap:10px; margin-bottom:20px; height:80px">
+                            <button class="cw-dir ripple" onclick="calSetMapping('x','up')"><span
+                                    class="cw-dir-icon">⬆</span>Yukarı</button>
+                            <button class="cw-dir ripple" onclick="calSetMapping('x','down')"><span
+                                    class="cw-dir-icon">⬇</span>Aşağı</button>
+                            <button class="cw-dir ripple" onclick="calSetMapping('x','left')"><span
+                                    class="cw-dir-icon">⬅</span>Sol</button>
+                            <button class="cw-dir ripple" onclick="calSetMapping('x','right')"><span
+                                    class="cw-dir-icon">➡</span>Sağ</button>
+                        </div>
+
+                        <div class="cal-step-title" style="border-bottom-color:var(--green); color:var(--green)">Adım
+                            1B: Motor Y+ Testi</div>
+                        <p class="card-desc">Motorun Y+ yönündeki hareketini izleyin ve nesnenin ekranda hangi yöne
+                            kaydığını seçin.</p>
+                        <button class="btn btn-p ripple" onclick="calTestMotor('y',1)"
+                            style="margin-bottom:15px; width:100%; padding:10px; font-weight:bold; background:var(--green)">▶
+                            Y+ Yönüne Hareket Ettir</button>
+                        <div id="calPickY" style="display:flex; gap:10px; height:80px">
+                            <button class="cw-dir ripple" onclick="calSetMapping('y','up')"><span
+                                    class="cw-dir-icon">⬆</span>Yukarı</button>
+                            <button class="cw-dir ripple" onclick="calSetMapping('y','down')"><span
+                                    class="cw-dir-icon">⬇</span>Aşağı</button>
+                            <button class="cw-dir ripple" onclick="calSetMapping('y','left')"><span
+                                    class="cw-dir-icon">⬅</span>Sol</button>
+                            <button class="cw-dir ripple" onclick="calSetMapping('y','right')"><span
+                                    class="cw-dir-icon">➡</span>Sağ</button>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Manuel Eksen Ayarı (Gelişmiş) -->
+                <div class="card">
+                    <div class="card-h" style="cursor:pointer"
+                        onclick="document.getElementById('manualOverride').style.display = document.getElementById('manualOverride').style.display === 'none' ? 'block' : 'none'">
+                        <span class="card-t">⚙️ Manuel Eksen Ayarı (İleri Düzey)</span>
+                        <span style="font-size:0.8rem; color:#888">Genişlet ▼</span>
+                    </div>
+                    <div class="card-b" id="manualOverride" style="display:none">
+                        <p class="card-desc">Otomatik algoritmaya güvenmiyorsanız yönleri manuel ters çevirebilirsiniz.
+                        </p>
+                        <div class="cfg-r"><label>Eksenleri Değiştir (Swap X↔Y)</label><input type="checkbox"
+                                class="cfg-cb" id="calSwapCb" checked></div>
+                        <div class="cfg-r"><label>Ekran X Ters Çevir</label><input type="checkbox" class="cfg-cb"
+                                id="calNegXCb"></div>
+                        <div class="cfg-r"><label>Ekran Y Ters Çevir</label><input type="checkbox" class="cfg-cb"
+                                id="calNegYCb" checked></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- ══════ TAB: AYARLAR ══════ -->
+    <main class="tab-content" id="tab-settings">
+        <style>
+            .stg-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+                gap: 16px;
+                padding: 20px
+            }
+
+            .stg-section {
+                font-size: 0.75rem;
+                color: #888;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                margin-bottom: 8px;
+                padding-bottom: 4px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1)
+            }
+
+            .stg-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 6px 0;
+                gap: 10px;
+                font-size: 0.85rem
+            }
+
+            .stg-row label {
+                color: #ccc;
+                flex: 1;
+                white-space: nowrap
+            }
+
+            .stg-row .stg-val {
+                flex: 0 0 auto;
+                min-width: 80px
+            }
+
+            .stg-row input[type=number],
+            .stg-row input[type=text],
+            .stg-row select {
+                background: #111;
+                border: 1px solid #333;
+                color: #fff;
+                border-radius: 4px;
+                padding: 5px 8px;
+                font-size: 0.82rem;
+                font-family: inherit
+            }
+
+            .stg-row input[type=number] {
+                width: 80px;
+                text-align: center
+            }
+
+            .stg-row input[type=text] {
+                width: 100%
+            }
+
+            .stg-row input[type=checkbox] {
+                width: 18px;
+                height: 18px;
+                accent-color: var(--blue)
+            }
+
+            .stg-save-row {
+                display: flex;
+                justify-content: flex-end;
+                padding-top: 10px;
+                border-top: 1px solid rgba(255, 255, 255, 0.08);
+                margin-top: 8px
+            }
+        </style>
+        <div class="stg-grid">
+            <!-- MOTOR & KALİBRASYON -->
+            <div class="card">
+                <div class="card-h"><span class="card-t">🎛️ Motor & Kalibrasyon</span></div>
+                <div class="card-b" style="padding:12px">
+                    <div class="stg-section">Piksel → mm</div>
+                    <div class="stg-row"><label>X Katsayısı</label><input type="number" step="0.001" id="cfgPxX"
+                            value="0.1"></div>
+                    <div class="stg-row"><label>Y Katsayısı</label><input type="number" step="0.001" id="cfgPxY"
+                            value="0.1"></div>
+                    <div class="stg-section" style="margin-top:10px">Hedef Nokta (px)</div>
+                    <div class="stg-row"><label>Hedef X</label><input type="number" id="cfgTX" value="200"></div>
+                    <div class="stg-row"><label>Hedef Y</label><input type="number" id="cfgTY" value="150"></div>
+                    <div class="stg-section" style="margin-top:10px">Motor</div>
+                    <div class="stg-row"><label>Feed Rate (mm/dk)</label><input type="number" id="cfgFeed" value="1000">
+                    </div>
+                    <div class="stg-row"><label>Tolerans (px)</label><input type="number" id="cfgTol" value="5"></div>
+                    <div class="stg-row"><label>Maks İterasyon</label><input type="number" id="cfgMaxIter" value="10">
+                    </div>
+                    <div class="stg-section" style="margin-top:10px">Yön</div>
+                    <div class="stg-row"><label>X Ekseni Ters</label><input type="checkbox" id="cfgIX"></div>
+                    <div class="stg-row"><label>Y Ekseni Ters</label><input type="checkbox" id="cfgIY"></div>
+                    <div class="stg-save-row">
+                        <button class="btn btn-p ripple" style="padding:6px 20px; font-size:0.82rem"
+                            onclick="saveConfig()">💾 Kaydet</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OCR AYARLARI -->
+            <div class="card">
+                <div class="card-h"><span class="card-t">🔍 OCR Ayarları</span></div>
+                <div class="card-b" style="padding:12px">
+                    <div class="stg-section">Algılama</div>
+                    <div class="stg-row"><label>Güven Eşiği</label>
+                        <div style="display:flex;align-items:center;gap:6px;flex:0 0 140px">
+                            <input type="range" min="10" max="100" step="5" id="cfgOcrConf" value="40" style="flex:1"
+                                oninput="$('cfgOcrConfVal').textContent=this.value">
+                            <span class="mono" id="cfgOcrConfVal" style="min-width:24px;font-size:0.8rem">40</span>
+                        </div>
+                    </div>
+                    <div class="stg-row"><label>PSM Modu</label>
+                        <select id="cfgOcrPsm" style="width:140px">
+                            <option value="6">SINGLE_BLOCK (6)</option>
+                            <option value="11">SPARSE_TEXT (11)</option>
+                            <option value="3">AUTO (3)</option>
+                        </select>
+                    </div>
+                    <div class="stg-section" style="margin-top:10px">Filtreler</div>
+                    <div class="stg-row"><label>Whitelist</label><input type="text" id="cfgOcrWhitelist"
+                            value="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                            style="text-transform:uppercase;font-family:'JetBrains Mono';letter-spacing:1px;flex:0 0 180px">
+                    </div>
+                    <div class="stg-row"><label>Min. Kelime</label><input type="number" id="cfgMinWordLen" value="3"
+                            min="1" max="20" style="width:60px"><span
+                            style="font-size:0.7rem;color:#666;margin-left:4px">harf</span></div>
+                    <div class="stg-row"><label>Kutu Büyüme</label><input type="number" id="cfgBoxGrowth" value="3.0"
+                            min="1.5" max="20" step="0.5" style="width:60px"><span
+                            style="font-size:0.7rem;color:#666;margin-left:4px">x</span></div>
+                    <div class="stg-section" style="margin-top:10px">Başlangıç</div>
+                    <div class="stg-row"><label>Açılışta Otomatik Home</label><input type="checkbox" id="cfgAutoHome"
+                            checked></div>
+                    <div class="stg-save-row">
+                        <button class="btn btn-p ripple" style="padding:6px 20px; font-size:0.82rem"
+                            onclick="saveOcrConfig()">💾 Kaydet</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OCR İZLEME -->
+            <div class="card">
+                <div class="card-h">
+                    <span class="card-t">📊 OCR İzleme</span>
+                    <button class="btn-sm" onclick="clearErrors()">Temizle</button>
+                </div>
+                <div class="card-b" style="padding:12px">
+                    <div style="display:flex; gap:15px; margin-bottom:10px">
+                        <div style="flex:1; text-align:center; background:#111; border-radius:6px; padding:8px">
+                            <div style="font-size:0.7rem; color:#888">ALGILANAN</div>
+                            <div class="mono" id="detCnt" style="font-size:1.3rem; font-weight:bold; color:var(--blue)">
+                                0</div>
+                        </div>
+                        <div style="flex:1; text-align:center; background:#111; border-radius:6px; padding:8px">
+                            <div style="font-size:0.7rem; color:#888">HEDEF</div>
+                            <div id="tgtSt" class="mono tgt-search" style="font-size:0.9rem; font-weight:bold">Aranıyor
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ocr-results" id="ocrList" style="max-height:80px; overflow-y:auto; margin-bottom:8px">
+                        <div class="ocr-empty">Yazı algılanmadı</div>
+                    </div>
+                    <div style="font-size:0.7rem; color:#666; font-weight:600; margin-bottom:4px">HATALAR</div>
+                    <div class="error-list" id="errorList" style="max-height:80px; overflow-y:auto">
+                        <div class="ocr-empty">Hata yok</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SİSTEM BİLGİSİ -->
+            <div class="card">
+                <div class="card-h"><span class="card-t">ℹ️ Sistem</span></div>
+                <div class="card-b" style="padding:12px">
+                    <div class="stg-row"><label>Motor Port</label><span class="mono" id="sysPort"
+                            style="color:var(--blue)">--</span></div>
+                    <div class="stg-row"><label>Motor Durum</label><span class="mono" id="sysMotor">--</span></div>
+                    <div class="stg-row"><label>Kamera</label><span class="mono" id="sysCam">--</span></div>
+                    <div class="stg-row"><label>GRBL State</label><span class="mono" id="sysGrbl">--</span></div>
+                    <div class="stg-row"><label>Çalışma Süresi</label><span class="mono" id="sysUptime">--</span></div>
+                    <div class="sep" style="margin:8px 0"></div>
+                    <div style="font-size:0.7rem; color:#666; font-weight:600; margin-bottom:4px">KISAYOLLAR</div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap">
+                        <span style="background:#222; padding:3px 8px; border-radius:4px; font-size:0.75rem">⬆⬇⬅➡
+                            Motor</span>
+                        <span style="background:#222; padding:3px 8px; border-radius:4px; font-size:0.75rem">H
+                            Home</span>
+                        <span style="background:#222; padding:3px 8px; border-radius:4px; font-size:0.75rem">C
+                            Center</span>
+                        <span style="background:#222; padding:3px 8px; border-radius:4px; font-size:0.75rem">E
+                            Kapat</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ══════ TAB: KONUMLAR ══════ -->
+    <main class="tab-content" id="tab-bases">
+        <div class="settings-layout">
+            <!-- Sol Kolon: Yeni Konum Ekle -->
+            <div class="card">
+                <div class="card-h"><span class="card-t">➕ Yeni Konum Ekle</span></div>
+                <div class="card-b">
+                    <div class="cfg-grid">
+                        <div class="cfg-r"><label>Konum Adı</label><input type="text" class="cfg-in" id="baseName"
+                                placeholder="Örn: Home, Pick1..."></div>
+                        <div class="cfg-r"><label>X (mm)</label><input type="number" class="cfg-in" id="baseX"
+                                value="0"></div>
+                        <div class="cfg-r"><label>Y (mm)</label><input type="number" class="cfg-in" id="baseY"
+                                value="0"></div>
+                        <div class="cfg-r"><label>Z (mm)</label><input type="number" class="cfg-in" id="baseZ"
+                                value="0"></div>
+                        <div class="sep"></div>
+                        <div class="btn-row">
+                            <button class="btn btn-c ripple" onclick="fetchCurrentPos()">📍 Mevcut Konumu Çek</button>
+                            <button class="btn btn-p ripple" onclick="saveBase()">💾 Kaydet</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sağ Kolon: Kayıtlı Konumlar Listesi -->
+            <div class="card" style="grid-column: span 1">
+                <div class="card-h"><span class="card-t">📋 Kayıtlı Konumlar</span></div>
+                <div class="card-b">
+                    <div class="base-list" id="baseList">
+                        <div class="ocr-empty">Kayıtlı konum yok.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ══════ TAB: SENARYOLAR (UNIFIED) ══════ -->
+    <main class="tab-content" id="tab-scenarios">
+        <div style="display:flex; gap:20px; padding:20px; align-items:flex-start; flex-wrap:wrap">
+
+            <!-- SOL: NORMAL SENARYOLAR -->
+            <div style="flex:1; min-width:400px; display:flex; flex-direction:column; gap:20px">
+                <style>
+                    .scenario-section-h {
+                        font-size: 1.2rem;
+                        font-weight: bold;
+                        border-bottom: 2px solid var(--blue);
+                        padding-bottom: 8px;
+                        margin-bottom: 10px;
+                        color: var(--blue)
+                    }
+
+                    .scenario-section-h.master {
+                        border-bottom-color: var(--yellow);
+                        color: var(--yellow)
+                    }
+                </style>
+                <div class="scenario-section-h">🎬 Standart Senaryolar</div>
+                <div class="card">
+                    <div class="card-h"><span class="card-t">Oluştur / Düzenle</span>
+                        <button class="btn btn-sm ripple"
+                            style="background:#4caf50; color:#fff; display:flex; align-items:center; gap:4px"
+                            onclick="createNewScenario()">➕ Yeni Senaryo Ekle</button>
+                    </div>
+                    <div class="card-b">
+                        <div class="cfg-r"><label>Senaryo Adı</label><input type="text" class="cfg-in" id="scenarioName"
+                                placeholder="Örn: Pick & Place 1"></div>
+                        <div class="sep" style="margin:10px 0"></div>
+                        <!-- Adım Ekleme -->
+                        <div style="font-size:0.8rem; color:#aaa; margin-bottom:6px; font-weight:600">YENİ ADIM EKLE
+                        </div>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:flex-end">
+                            <div style="flex:1; min-width:120px">
+                                <select class="cfg-in" id="stepType" onchange="onStepTypeChange()">
+                                    <option value="goto_base">📍 Konuma Git</option>
+                                    <option value="auto_center">🎯 Kelimeye Merkezle</option>
+                                    <option value="verify">👁️ Doğruluk Kontrolü</option>
+                                    <option value="pump_on">💨 Pompa AÇ</option>
+                                    <option value="pump_off">🛑 Pompa KAPAT</option>
+                                    <option value="delay">⏳ Bekle</option>
+                                    <option value="move_z">↕️ Z Konumuna Git</option>
+                                    <option value="home">🏠 Home</option>
+                                    <option value="resistance_read">🔬 Direnç Ölç (Anlık)</option>
+                                    <option value="diode_read">💡 Diyot Test Et (Anlık)</option>
+                                    <option value="resistance_test">🔬 Direnç Testi</option>
+                                    <option value="diode_test">💡 Diyot Testi</option>
+                                    <option value="nozzle_goto">🔄 Nozzle Açıya Git</option>
+                                    <option value="nozzle_home">🏠 Nozzle Home</option>
+                                    <option value="if_resistance">🔬 IF Direnç Koşulu</option>
+                                    <option value="if_diode">💡 IF Diyot Koşulu</option>
+
+                                </select>
+                            </div>
+                            <div id="stepParamBox" style="flex:2; min-width:200px">
+                                <select class="cfg-in" id="stepBaseSelect"></select>
+                            </div>
+                            <button id="addStepBtn" class="btn btn-p ripple" onclick="addScenarioStep()"
+                                style="padding:8px 16px; font-weight:bold">+ Ekle</button>
+                        </div>
+                        <div class="sep" style="margin:10px 0"></div>
+                        <!-- Adım Listesi -->
+                        <div style="font-size:0.8rem; color:#aaa; margin-bottom:6px; font-weight:600">ADIMLAR</div>
+                        <div id="scenarioStepList"
+                            style="max-height:400px; overflow-y:auto; border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:4px; min-height:50px">
+                            <div class="ocr-empty">Henüz adım eklenmedi.</div>
+                        </div>
+                        <div class="sep" style="margin:10px 0"></div>
+                        <div class="btn-row" style="gap:8px">
+                            <button class="btn ripple" onclick="clearScenarioSteps()"
+                                style="padding:8px 16px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.85rem">🗑
+                                Temizle</button>
+                            <button class="btn ripple" onclick="saveScenario()"
+                                style="padding:8px 16px; background:var(--blue); color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.85rem">💾
+                                Kaydet</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-h"><span class="card-t">📋 Kayıtlı Senaryolar</span></div>
+                    <div class="card-b">
+                        <div id="scenarioList" style="max-height:200px; overflow-y:auto">
+                            <div class="ocr-empty">Kayıtlı senaryo yok.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SAĞ: MASTER SENARYOLAR -->
+            <div style="flex:1; min-width:400px; display:flex; flex-direction:column; gap:20px">
+                <div class="scenario-section-h master">👑 Master Senaryolar</div>
+                <div class="card">
+                    <div class="card-h"><span class="card-t">Oluştur / Düzenle</span></div>
+                    <div class="card-b">
+                        <p class="card-desc">Birden fazla senaryoyu arka arkaya çalışacak şekilde birleştirin.</p>
+                        <div class="cfg-r"><label>Master Senaryo Adı</label><input type="text" class="cfg-in"
+                                id="masterScenarioName" placeholder="Örn: Tam Üretim Akışı"></div>
+                        <div class="sep" style="margin:10px 0"></div>
+
+                        <div style="font-size:0.8rem; color:#aaa; margin-bottom:6px; font-weight:600">SENARYO EKLE</div>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:flex-end">
+                            <div style="flex:2; min-width:120px">
+                                <select class="cfg-in" id="masterStepSelect"></select>
+                            </div>
+                            <button class="btn ripple" onclick="addMasterScenarioStep()"
+                                style="padding:8px 16px; font-weight:bold; background:var(--blue); color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:0.85rem">+
+                                Ekle</button>
+                        </div>
+
+                        <div class="sep" style="margin:10px 0"></div>
+                        <div style="font-size:0.8rem; color:#aaa; margin-bottom:6px; font-weight:600">ÇALIŞTIRMA SIRASI
+                        </div>
+                        <div id="masterScenarioStepList"
+                            style="max-height:250px; overflow-y:auto; border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:4px; min-height:50px">
+                            <div class="ocr-empty">Henüz senaryo eklenmedi.</div>
+                        </div>
+
+                        <div class="sep" style="margin:10px 0"></div>
+                        <div class="btn-row" style="gap:8px">
+                            <button class="btn ripple" onclick="clearMasterScenarioSteps()"
+                                style="padding:8px 16px; background:#d32f2f; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.85rem">🗑
+                                Temizle</button>
+                            <button class="btn ripple" onclick="saveMasterScenario()"
+                                style="padding:8px 16px; background:var(--blue); color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:0.85rem">💾
+                                Kaydet</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-h"><span class="card-t">📋 Kayıtlı Master Senaryolar</span></div>
+                    <div class="card-b">
+                        <div id="masterScenarioList" style="max-height:200px; overflow-y:auto">
+                            <div class="ocr-empty">Kayıtlı master senaryo yok.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ══════ TAB: NOZZLE ══════ -->
+    <main class="tab-content" id="tab-nozzle">
+        <style>
+            .nz-dashboard {
+                display: grid;
+                grid-template-columns: 320px 1fr 310px;
+                gap: 12px;
+                padding: 14px;
+                height: calc(100vh - 75px);
+                overflow: hidden;
+            }
+
+            .nz-col {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                overflow-y: auto;
+                max-height: 100%;
+            }
+
+            .nz-col::-webkit-scrollbar {
+                width: 4px;
+            }
+
+            .nz-col::-webkit-scrollbar-thumb {
+                background: #444;
+                border-radius: 4px;
+            }
+
+            /* Angle Display */
+            .nz-angle-display {
+                background: linear-gradient(135deg, #0a0e1a 0%, #111827 100%);
+                border-radius: 16px;
+                padding: 18px;
+                border: 1px solid rgba(59, 130, 246, 0.2);
+                text-align: center;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .nz-angle-display::before {
+                content: '';
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: radial-gradient(circle at center, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+                animation: nzPulse 4s ease-in-out infinite;
+            }
+
+            @keyframes nzPulse {
+
+                0%,
+                100% {
+                    opacity: 0.5;
+                }
+
+                50% {
+                    opacity: 1;
+                }
+            }
+
+            .nz-big-angle {
+                font-size: 3rem;
+                font-weight: 800;
+                color: var(--blue);
+                text-align: center;
+                line-height: 1;
+                font-family: 'JetBrains Mono', monospace;
+                position: relative;
+                z-index: 1;
+            }
+
+            .nz-unit {
+                font-size: 1rem;
+                color: #888;
+                font-weight: 400
+            }
+
+            .nz-status-dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                display: inline-block;
+                transition: all .3s;
+            }
+
+            .nz-status-dot.on {
+                background: #4caf50;
+                box-shadow: 0 0 8px #4caf50
+            }
+
+            .nz-status-dot.off {
+                background: #f44336;
+                box-shadow: 0 0 8px #f44336
+            }
+
+            /* Rotation Buttons */
+            .nz-rot-btn {
+                padding: 7px 0;
+                font-size: 0.78rem;
+                font-weight: 700;
+                border: 1px solid #333;
+                background: rgba(255, 255, 255, 0.04);
+                color: #ccc;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: all .2s;
+                flex: 1;
+                text-align: center;
+            }
+
+            .nz-rot-btn:hover {
+                background: rgba(59, 130, 246, 0.1);
+                border-color: var(--blue);
+                color: var(--blue);
+                transform: translateY(-1px);
+            }
+
+            /* Measurement Cards */
+            .nz-measure-panel {
+                background: linear-gradient(135deg, #0a0e1a 0%, #111420 100%);
+                border-radius: 12px;
+                padding: 14px;
+                border: 1px solid #222;
+                text-align: center;
+            }
+
+            .nz-measure-val {
+                font-size: 1.8rem;
+                font-weight: 800;
+                color: var(--green);
+                text-align: center;
+                font-family: 'JetBrains Mono', monospace;
+                line-height: 1.2;
+            }
+
+            .nz-measure-sub {
+                font-size: 0.72rem;
+                color: #666;
+                text-align: center;
+                margin-top: 3px;
+            }
+
+            /* Test Progress */
+            .nz-test-progress {
+                display: flex;
+                gap: 3px;
+                margin: 6px 0;
+                flex-wrap: wrap;
+            }
+
+            .nz-test-dot {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: #222;
+                border: 1px solid #444;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.55rem;
+                font-weight: bold;
+                transition: all .3s;
+            }
+
+            .nz-test-dot.pass {
+                background: #4caf50;
+                border-color: #66bb6a;
+                color: #fff
+            }
+
+            .nz-test-dot.fail {
+                background: #f44336;
+                border-color: #ef5350;
+                color: #fff
+            }
+
+            .nz-test-dot.active {
+                border-color: var(--blue);
+                box-shadow: 0 0 8px var(--blue)
+            }
+
+            /* Decision Badge */
+            .nz-decision {
+                font-size: 1.1rem;
+                font-weight: 800;
+                text-align: center;
+                padding: 8px;
+                border-radius: 8px;
+                margin-top: 6px;
+            }
+
+            .nz-decision.pass {
+                background: rgba(76, 175, 80, .12);
+                color: #4caf50;
+                border: 1px solid rgba(76, 175, 80, .4)
+            }
+
+            .nz-decision.fail {
+                background: rgba(244, 67, 54, .12);
+                color: #f44336;
+                border: 1px solid rgba(244, 67, 54, .4)
+            }
+
+            /* Detail Table */
+            .nz-detail-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.72rem;
+                margin-top: 6px;
+            }
+
+            .nz-detail-table th {
+                background: rgba(255, 255, 255, 0.04);
+                color: #888;
+                padding: 4px 6px;
+                text-align: center;
+                font-weight: 600;
+                border-bottom: 1px solid #333;
+            }
+
+            .nz-detail-table td {
+                padding: 3px 6px;
+                text-align: center;
+                color: #ccc;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            }
+
+            .nz-detail-table tr:hover td {
+                background: rgba(255, 255, 255, 0.02);
+            }
+
+            .nz-stat-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 6px;
+                margin-top: 6px;
+            }
+
+            .nz-stat-box {
+                background: rgba(255, 255, 255, 0.03);
+                border-radius: 6px;
+                padding: 6px;
+                text-align: center;
+                border: 1px solid #222;
+            }
+
+            .nz-stat-label {
+                font-size: 0.6rem;
+                color: #666;
+                text-transform: uppercase;
+                font-weight: 600;
+            }
+
+            .nz-stat-value {
+                font-size: 0.85rem;
+                font-weight: 700;
+                color: var(--blue);
+                font-family: 'JetBrains Mono', monospace;
+            }
+
+            /* Settings Column */
+            .nz-settings-section {
+                font-size: 0.68rem;
+                color: #666;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                margin: 8px 0 4px;
+                padding-bottom: 3px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            }
+
+            .nz-cfg-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 3px 0;
+                gap: 6px;
+                font-size: 0.78rem;
+            }
+
+            .nz-cfg-row label {
+                color: #aaa;
+                flex: 1;
+                white-space: nowrap;
+            }
+
+            .nz-cfg-row input,
+            .nz-cfg-row select {
+                background: #111;
+                border: 1px solid #333;
+                color: #fff;
+                border-radius: 4px;
+                padding: 3px 6px;
+                font-size: 0.75rem;
+                font-family: 'JetBrains Mono', monospace;
+                text-align: center;
+            }
+
+            .nz-cfg-row input[type=number] {
+                width: 65px;
+            }
+
+            .nz-cfg-row select {
+                width: 65px;
+            }
+        </style>
+
+        <div class="nz-dashboard">
+            <!-- ═══ LEFT COLUMN: Connection + Motor ═══ -->
+            <div class="nz-col">
+                <!-- BAĞLANTI -->
+                <div class="card" style="margin:0;flex-shrink:0">
+                    <div class="card-h"><span class="card-t">🔌 Bağlantı</span>
+                        <span id="nzStatusDot" class="nz-status-dot off"></span>
+                    </div>
+                    <div class="card-b" style="padding:10px">
+                        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+                            <label style="font-size:0.75rem;color:#888;white-space:nowrap">Port</label>
+                            <input type="text" class="cfg-in" id="nzPort" value="/dev/arduino_slave"
+                                style="flex:1;font-family:'JetBrains Mono';font-size:0.75rem;padding:5px 8px">
+                        </div>
+                        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+                            <label style="font-size:0.75rem;color:#888;white-space:nowrap">Durum</label>
+                            <span class="mono" id="nzConnStatus"
+                                style="color:#f44336;font-weight:bold;font-size:0.8rem">Bağlı Değil</span>
+                        </div>
+                        <div style="display:flex;gap:6px">
+                            <button class="btn btn-g ripple"
+                                style="flex:1;padding:8px;font-weight:bold;font-size:0.82rem"
+                                onclick="nozzleConnect()">🔌 Bağlan</button>
+                            <button class="btn btn-d ripple"
+                                style="flex:1;padding:8px;font-weight:bold;font-size:0.82rem"
+                                onclick="nozzleDisconnect()">⛔ Kopar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MOTOR KONTROL -->
+                <div class="card" style="margin:0;flex:1">
+                    <div class="card-h"><span class="card-t">🔄 Motor Kontrol</span></div>
+                    <div class="card-b" style="padding:10px">
+                        <div class="nz-angle-display" style="margin-bottom:10px">
+                            <div class="nz-big-angle" id="nzAngle">0.0<span class="nz-unit">°</span></div>
+                            <div style="margin-top:6px">
+                                <span id="nzHomedBadge"
+                                    style="background:#f44336;color:#fff;padding:2px 10px;border-radius:10px;font-weight:bold;font-size:0.7rem">HOME
+                                    YOK</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-y ripple"
+                            style="width:100%;padding:8px;font-weight:bold;margin-bottom:8px;font-size:0.85rem"
+                            onclick="nozzleHome()">🏠 Home</button>
+                        <div style="display:flex;gap:6px;margin-bottom:10px">
+                            <input type="number" class="cfg-in" id="nzTargetAngle" placeholder="Açı (°)" value="0"
+                                style="flex:1;text-align:center;font-size:1rem;height:36px">
+                            <button class="btn btn-p ripple" style="flex:0 0 70px;font-weight:bold;font-size:0.85rem"
+                                onclick="nozzleGoto()">GİT</button>
+                        </div>
+                        <div style="font-size:0.68rem;color:#666;margin-bottom:4px;font-weight:600">HIZLI DÖNDÜRME</div>
+                        <div style="display:flex;gap:3px;margin-bottom:3px">
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(-180)">-180°</button>
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(-90)">-90°</button>
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(-45)">-45°</button>
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(-15)">-15°</button>
+                        </div>
+                        <div style="display:flex;gap:3px">
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(15)">+15°</button>
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(45)">+45°</button>
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(90)">+90°</button>
+                            <button class="nz-rot-btn ripple" onclick="nozzleMoveRel(180)">+180°</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ CENTER COLUMN: Direnç + Diyot Measurement ═══ -->
+            <div class="nz-col">
+                <!-- DİRENÇ ÖLÇÜMÜ -->
+                <div class="card" style="margin:0;flex:1">
+                    <div class="card-h"><span class="card-t">🔬 Direnç Ölçümü</span></div>
+                    <div class="card-b" style="padding:10px">
+                        <div class="nz-measure-panel" style="margin-bottom:8px">
+                            <div class="nz-measure-val" id="nzResValue">--</div>
+                            <div class="nz-measure-sub" id="nzResDetails">ADC: -- | V: -- | Durum: --</div>
+                        </div>
+                        <button class="btn btn-c ripple"
+                            style="width:100%;padding:8px;font-weight:bold;margin-bottom:8px;font-size:0.82rem"
+                            onclick="nozzleReadResistance()">⚡ Anlık Ölçüm</button>
+                        <div style="border-top:1px solid #222;padding-top:8px">
+                            <div
+                                style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                                <span style="font-size:0.72rem;color:#aaa;font-weight:600">TEKRARLI TEST</span>
+                                <span style="font-size:0.65rem;color:#555">10 ölçüm → istatistik</span>
+                            </div>
+                            <div class="nz-test-progress" id="nzResProgress"></div>
+                            <div id="nzResTestResult" style="display:none"></div>
+                            <button class="btn btn-p ripple"
+                                style="width:100%;padding:8px;font-weight:bold;font-size:0.82rem"
+                                onclick="nozzleResistanceTest()">🔬 Tekrarlı Direnç Testi Başlat</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DİYOT TESTİ -->
+                <div class="card" style="margin:0;flex:1">
+                    <div class="card-h"><span class="card-t">💡 Diyot Testi</span></div>
+                    <div class="card-b" style="padding:10px">
+                        <div class="nz-measure-panel" style="margin-bottom:8px">
+                            <div class="nz-measure-val" id="nzDiodeValue" style="font-size:1.4rem">--</div>
+                            <div class="nz-measure-sub" id="nzDiodeDetails">ADC: -- | Eşik: --</div>
+                        </div>
+                        <button class="btn btn-c ripple"
+                            style="width:100%;padding:8px;font-weight:bold;margin-bottom:8px;font-size:0.82rem"
+                            onclick="nozzleReadDiode()">⚡ Anlık Test</button>
+                        <div style="border-top:1px solid #222;padding-top:8px">
+                            <div
+                                style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                                <span style="font-size:0.72rem;color:#aaa;font-weight:600">TEKRARLI TEST</span>
+                                <span style="font-size:0.65rem;color:#555">10 ölçüm → çoğunluk kararı</span>
+                            </div>
+                            <div class="nz-test-progress" id="nzDiodeProgress"></div>
+                            <div id="nzDiodeTestResult" style="display:none"></div>
+                            <div style="display:flex;align-items:center;gap:8px;margin:6px 0">
+                                <label style="font-size:0.75rem;color:#aaa;flex:1">Otomatik Düzeltme (180° dön)</label>
+                                <input type="checkbox" id="nzAutoCorrect" checked
+                                    style="width:16px;height:16px;accent-color:var(--blue)">
+                            </div>
+                            <button class="btn btn-p ripple"
+                                style="width:100%;padding:8px;font-weight:bold;font-size:0.82rem"
+                                onclick="nozzleDiodeTest()">💡 Tekrarlı Diyot Testi Başlat</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ RIGHT COLUMN: Settings ═══ -->
+            <div class="nz-col">
+                <div class="card" style="margin:0;flex:1">
+                    <div class="card-h"><span class="card-t">⚙️ Nozzle Ayarları</span></div>
+                    <div class="card-b" style="padding:10px">
+                        <div class="nz-settings-section">Motor Parametreleri</div>
+                        <div class="nz-cfg-row"><label>Adım/Devir</label><input type="number" id="nzCfgStepsRev"
+                                value="200"></div>
+                        <div class="nz-cfg-row"><label>Mikro Adımlama</label>
+                            <select id="nzCfgMicrostep">
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="4">4</option>
+                                <option value="8">8</option>
+                                <option value="16" selected>16</option>
+                            </select>
+                        </div>
+                        <div class="nz-cfg-row"><label>Min Açı (°)</label><input type="number" id="nzCfgMinAngle"
+                                value="-180"></div>
+                        <div class="nz-cfg-row"><label>Max Açı (°)</label><input type="number" id="nzCfgMaxAngle"
+                                value="180"></div>
+
+                        <div class="nz-settings-section">Hız (µs/adım)</div>
+                        <div class="nz-cfg-row"><label>Normal Hız</label><input type="number" id="nzCfgNormalSpeed"
+                                value="400"></div>
+                        <div class="nz-cfg-row"><label>Homing Hızı</label><input type="number" id="nzCfgHomingSpeed"
+                                value="2000"></div>
+                        <div class="nz-cfg-row"><label>İvme Adım</label><input type="number" id="nzCfgAccelSteps"
+                                value="200"></div>
+                        <div class="nz-cfg-row"><label>İvme Başlangıç</label><input type="number" id="nzCfgAccelStart"
+                                value="2000"></div>
+
+                        <div class="nz-settings-section">Pinler</div>
+                        <div class="nz-cfg-row"><label>Limit Switch</label><input type="number" id="nzCfgLimitPin"
+                                value="9" style="width:50px"></div>
+                        <div class="nz-cfg-row"><label>Analog Pin</label><input type="number" id="nzCfgAnalogPin"
+                                value="1" style="width:50px"></div>
+                        <div class="nz-cfg-row"><label>Homing Yönü</label><input type="number" id="nzCfgHomingDir"
+                                value="1" min="0" max="1" style="width:50px"></div>
+                        <div class="nz-cfg-row"><label>Geri Yön</label><input type="number" id="nzCfgBackDir" value="0"
+                                min="0" max="1" style="width:50px"></div>
+
+                        <div class="nz-settings-section">Ölçüm Parametreleri</div>
+                        <div class="nz-cfg-row"><label>Bilinen R (Ω)</label><input type="number" id="nzCfgKnownR"
+                                value="10000" style="width:75px"></div>
+                        <div class="nz-cfg-row"><label>ADC Örnekleme</label><input type="number" id="nzCfgAdcSamples"
+                                value="20" style="width:50px"></div>
+                        <div class="nz-cfg-row"><label>Diyot Eşik</label><input type="number" id="nzCfgDiodeThreshold"
+                                value="500" style="width:70px"></div>
+                        <div class="nz-cfg-row"><label>Test Sayısı</label><input type="number" id="nzCfgTestCount"
+                                value="10" style="width:50px"></div>
+                        <div class="nz-cfg-row"><label>Test Aralığı (sn)</label><input type="number" step="0.1"
+                                id="nzCfgTestInterval" value="1.0" style="width:55px"></div>
+
+                        <div style="margin-top:10px;padding-top:8px;border-top:1px solid #222">
+                            <button class="btn btn-p ripple"
+                                style="width:100%;padding:8px;font-size:0.8rem;font-weight:bold"
+                                onclick="saveNozzleConfig()">💾 Ayarları Kaydet</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ══════ TAB: DOĞRULAMA (VERIFICATION) ══════ -->
+    <main class="tab-content" id="tab-verification">
+        <div
+            style="display:flex; gap:14px; padding:14px; align-items:flex-start; height:calc(100vh - 75px); overflow:hidden">
+            <!-- SOL: Ayarlar, Kutular, Sonuçlar -->
+            <div
+                style="width:310px; flex-shrink:0; display:flex; flex-direction:column; gap:10px; overflow-y:auto; max-height:100%">
+                <div class="card" style="margin:0">
+                    <div class="card-h"><span class="card-t">👁️ Ayarlar</span></div>
+                    <div class="card-b" style="padding:10px; display:flex; flex-direction:column; gap:8px">
+                        <div class="cfg-r"><label>Konum</label><select id="vBaseSelect" class="cfg-in"></select></div>
+                        <div style="background:#111; border-radius:6px; padding:8px; border:1px solid #333">
+                            <div style="font-size:0.7rem; color:#888; font-weight:700; margin-bottom:4px">THRESHOLD
+                                (EŞİK)</div>
+                            <div style="display:flex; align-items:center; gap:8px">
+                                <input type="range" id="vThreshold" min="0" max="255" value="127" style="flex:1"
+                                    oninput="document.getElementById('vThVal').textContent=this.value">
+                                <span id="vThVal" class="mono"
+                                    style="font-size:1.1rem; font-weight:bold; color:var(--orange); min-width:28px">127</span>
+                            </div>
+                            <p style="font-size:0.55rem; color:#555; margin-top:2px">Düşük=fazla siyah, Yüksek=az siyah
+                            </p>
+                        </div>
+                        <div style="display:flex; gap:6px">
+                            <button class="btn btn-p ripple" onclick="saveVerificationSettings()"
+                                style="flex:1; font-weight:bold; height:32px; font-size:0.8rem">💾 Kaydet</button>
+                            <button class="btn ripple" onclick="testVerification()"
+                                style="flex:1; font-weight:bold; height:32px; font-size:0.8rem; background:var(--orange); color:#fff; border:none; border-radius:6px; cursor:pointer">▶
+                                Test Et</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card" style="margin:0">
+                    <div class="card-h">
+                        <span class="card-t">📦 Kutular (ROI)</span>
+                        <button class="btn-sm" style="background:var(--blue); color:#fff; padding:3px 8px"
+                            onclick="addNewVerificationBox()">+ Yeni</button>
+                    </div>
+                    <div class="card-b" style="padding:8px">
+                        <div id="vBoxEditorList" style="display:flex; flex-direction:column; gap:6px"></div>
+                    </div>
+                </div>
+                <!-- SONUÇLAR burada kaldırıldı, sağ kolona taşındı -->
+            </div>
+
+            <!-- ORTA: Kamera + Kutu Çizim -->
+            <div
+                style="flex:1; display:flex; flex-direction:column; gap:10px; min-width:0; max-height:100%; overflow-y:auto">
+                <div class="card cam-card"
+                    style="flex:1; display:flex; flex-direction:column; overflow:hidden; margin:0">
+                    <div class="card-h" style="flex-shrink:0"><span class="card-t">📸 Kamera (Kutuları
+                            Sürükle/Boyutlandır)</span></div>
+                    <div class="card-b"
+                        style="position:relative; flex:1; display:flex; align-items:center; justify-content:center; background:#000; overflow:hidden; padding:0"
+                        id="vCanvasContainer">
+                        <img src="/video_feed_raw" id="vMainCam" alt="Canlı Kamera"
+                            style="max-width:100%; max-height:100%; object-fit:contain; display:block"
+                            draggable="false">
+                        <div id="vBoxOverlay" style="position:absolute; pointer-events:none">
+                            <!-- JS ile konumlandırılacak -->
+                        </div>
+                    </div>
+                </div>
+                <!-- SONUÇLAR PANELİ burada kaldırıldı, sağ kolona taşındı -->
+            </div>
+
+            <!-- SAĞ: Threshold Önizleme -->
+            <div
+                style="width:260px; flex-shrink:0; display:flex; flex-direction:column; gap:10px; max-height:100%; overflow-y:auto">
+                <div class="card" id="vResultsPanel" style="margin:0; display:none; flex-shrink:0">
+                    <div class="card-h"><span class="card-t">📊 Sonuçlar</span></div>
+                    <div class="card-b" id="vResultsContent" style="padding:8px"></div>
+                </div>
+                <div class="card" style="margin:0">
+                    <div class="card-h"><span class="card-t">🖼 Threshold Önizleme</span></div>
+                    <div class="card-b" style="padding:0; background:#000">
+                        <img id="vThresholdPreview" src="" alt="Test yapıldıktan sonra görünecek"
+                            style="width:100%; display:block; min-height:200px; background:#111; border-radius:0 0 8px 8px; object-fit:contain">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

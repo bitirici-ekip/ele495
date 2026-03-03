@@ -1,0 +1,20 @@
+[
+  {
+    "name": "ANA İŞLEV",
+    "sequence": [
+      "CRB to R1",
+      "SHN to R2",
+      "AYD to D2",
+      "MUS to D1"
+    ]
+  },
+  {
+    "name": "FULL SETUP",
+    "sequence": [
+      "CRB YOLU",
+      "SHN YOLU",
+      "AYD YOLU",
+      "MUS YOLU"
+    ]
+  }
+]

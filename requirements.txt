@@ -1,0 +1,7 @@
+numpy
+opencv-python
+pillow
+tesserocr
+pyserial
+flask
+flask-socketio
