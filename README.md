@@ -1,498 +1,537 @@
-<![CDATA[<div align="center">
+# 🏭 PNP Control Center v2.0
 
-# 🏭 PNP Kontrol Merkezi
+<div align="center">
 
-### Pick & Place CNC Makine Kontrol Sistemi — v2.0
+**Endüstriyel Pick & Place Makinesi için Web Tabanlı Akıllı Kontrol Merkezi**
 
-[![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Flask](https://img.shields.io/badge/Flask-SocketIO-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com)
-[![Arduino](https://img.shields.io/badge/Arduino-Firmware-00979D?style=for-the-badge&logo=arduino&logoColor=white)](https://arduino.cc)
-[![Raspberry Pi](https://img.shields.io/badge/Raspberry%20Pi-Picamera2-A22846?style=for-the-badge&logo=raspberrypi&logoColor=white)](https://www.raspberrypi.com)
-[![GRBL](https://img.shields.io/badge/GRBL-CNC%20Controller-FF6B35?style=for-the-badge)](https://github.com/gnea/grbl)
-[![License](https://img.shields.io/badge/ELE495-Bitirme%20Projesi-gold?style=for-the-badge)](https://github.com/bitirici-ekip/ele495)
-
----
-
-**Raspberry Pi üzerinde çalışan, GRBL tabanlı CNC motor kontrolü, OCR yazı algılama, vakum nozzle sistemi, direnç/diyot ölçümü ve otomatik senaryo çalıştırma özelliklerine sahip profesyonel bir Pick & Place kontrol sistemidir.**
-
-[🚀 Kurulum](#-kurulum) • [📖 Özellikler](#-özellikler) • [🌐 Web Arayüzü](#-web-arayüzü-sayfaları) • [🔌 Donanım](#-donanım-mimarisi) • [📡 API](#-api-referansı) • [⌨️ Kısayollar](#️-klavye-kısayolları)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-2.x-000000?logo=flask)](https://flask.palletsprojects.com/)
+[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.x-010101?logo=socket.io)](https://socket.io/)
+[![OpenCV](https://img.shields.io/badge/OpenCV-4.x-5C3EE8?logo=opencv)](https://opencv.org/)
+[![Arduino](https://img.shields.io/badge/Arduino-Compatible-00979D?logo=arduino)](https://www.arduino.cc/)
+[![License](https://img.shields.io/badge/License-ELE495-orange)](#lisans)
 
 </div>
+
+> Raspberry Pi üzerinde çalışan, Flask + Socket.IO altyapısıyla **gerçek zamanlı makine kontrolü**, **kamera izleme**, **OCR tabanlı otomasyon**, **koşullu test senaryoları** ve **nozzle yönetimi** sunan kapsamlı bir endüstriyel kontrol sistemi.
 
 ---
 
 ## 📋 İçindekiler
 
-- [🚀 Kurulum](#-kurulum)
-- [📖 Özellikler](#-özellikler)
-- [🌐 Web Arayüzü Sayfaları](#-web-arayüzü-sayfaları)
-  - [🎮 Kontrol Paneli](#-1-kontrol-paneli)
-  - [🔧 Kalibrasyon](#-2-kalibrasyon)
-  - [⚙️ Ayarlar](#%EF%B8%8F-3-ayarlar)
-  - [📍 Konumlar](#-4-konumlar-bases)
-  - [🎬 Senaryolar](#-5-senaryolar)
-  - [🔧 Nozzle](#-6-nozzle-kontrolü)
-  - [👁️ Doğrulama](#%EF%B8%8F-7-doğrulama-verification)
-- [🔌 Donanım Mimarisi](#-donanım-mimarisi)
-- [📡 API Referansı](#-api-referansı)
-- [⌨️ Klavye Kısayolları](#️-klavye-kısayolları)
-- [📂 Proje Yapısı](#-proje-yapısı)
-- [🔧 Konfigürasyon](#-konfigürasyon)
-- [🤝 Katkıda Bulunma](#-katkıda-bulunma)
+- [Genel Bakış](#-genel-bakış)
+- [Özellikler](#-özellikler)
+- [Sistem Mimarisi](#-sistem-mimarisi)
+- [Kurulum](#-kurulum)
+- [Kullanım](#-kullanım)
+- [Sayfa ve Sekmeler](#-sayfa-ve-sekmeler)
+- [Senaryo Sistemi Detayları](#-senaryo-sistemi-detayları)
+- [API Referansı](#-api-referansı)
+- [Donanım Gereksinimleri](#-donanım-gereksinimleri)
+- [Yapılandırma](#-yapılandırma)
+- [Proje Yapısı](#-proje-yapısı)
+- [Lisans](#-lisans)
 
 ---
 
-## 🚀 Kurulum
+## 🔍 Genel Bakış
 
-### Gereksinimler
+PNP Control Center, bir **Pick and Place** makinesinin tüm bileşenlerini — CNC motorları, vakum pompası, kamera, OCR, nozzle step motor, direnç/diyot ölçümü — tek bir web arayüzünden yönetmeyi sağlayan **entegre bir kontrol sistemidir**.
 
-| Bileşen | Gereksinim |
-|---------|-----------|
-| **İşletim Sistemi** | Raspberry Pi OS (64-bit önerilir) |
-| **Python** | 3.9 veya üstü |
-| **Kamera** | Raspberry Pi Camera Module (Picamera2 uyumlu) |
-| **CNC Kontrol** | GRBL firmware yüklü Arduino (Uno/Nano) |
-| **Nozzle** | Stepper motor kontrollü Arduino (Slave firmware) |
-| **OCR** | Tesseract OCR (tesserocr Python binding) |
+### Temel Yetenekler
 
-### Adım Adım Kurulum
+| Alan | Açıklama |
+|------|----------|
+| 🎮 **Motor Kontrol** | GRBL tabanlı 3 eksen (X, Y, Z) CNC motor kontrolü |
+| 📷 **Kamera & OCR** | Gerçek zamanlı görüntü akışı, Tesseract OCR ile metin tanıma |
+| 🔧 **Nozzle Sistemi** | Step motor ile hassas açı kontrolü, direnç ve diyot ölçümü |
+| 🎬 **Senaryo Motoru** | Koşullu IF blokları ve çoklu adım senaryoları ile tam otomasyon |
+| 👁️ **Doğrulama** | Bileşen yerleşim doğrulaması (OCR tabanlı) |
+| 📍 **Konum Yönetimi** | Sınırsız kayıtlı konum, akıllı Z sıralamalı güvenli hareket |
+| ⚡ **Otomatik Port** | USB cihazlarını otomatik algılama ve bağlama |
+
+---
+
+## ✨ Özellikler
+
+### 🎮 Motor Kontrol
+- **3 Eksen Hareket**: X, Y, Z eksenlerinde hassas konumlandırma
+- **Jog Kontrolleri**: Ayarlanabilir adım boyutlarıyla (0.1mm – 50mm) manuel hareket
+- **Homing Döngüsü**: Otomatik referans alma, bağlantı kurulduğunda otomatik home
+- **Konum Kayıt**: Sınırsız kayıtlı konum (Base Position) tanımlama ve düzenleme
+- **Akıllı Z Sıralaması**: Çarpışma riski analizli güvenli hareket (Z önce/sonra otomatik karar)
+- **G-code Konsolu**: Doğrudan G-code komutu gönderebilme
+- **Klavye Kısayolları**: Ok tuşları, H (Home), C (Center), Space (Pompa)
+
+### 📷 Kamera Sistemi
+- **Canlı Yayın**: MJPEG formatında gerçek zamanlı kamera görüntüsü
+- **Çift Çözünürlük**: Yakalama (OCR) ve yayın (ekran) çözünürlükleri bağımsız ayarlanabilir
+- **PIP Zoom**: Çapraz imlecin olduğu noktada 1x–10x büyütme özelliği
+- **FPS Monitörü**: Kamera ve OCR FPS değerleri anlık gösterim
+- **Overlay Sistem**: Senaryo durumu, ölçüm sonuçları ve test banner'ları kamera üstünde
+
+### 🔤 OCR (Optik Karakter Tanıma)
+- **Tesseract Entegrasyonu**: Gerçek zamanlı metin tanıma (tesserocr)
+- **Bounding Box Görselleştirme**: Algılanan metnin etrafında dinamik çerçeveler
+- **Stabilizasyon**: Çerçeve boyut sınırlaması ile titreşim önleme
+- **Otomatik Merkezleme**: Hedef kelimeyi tespit edip makineyi o konuma otomatik hareket ettirme
+- **Beyaz Liste & PSM Modu**: Özelleştirilebilir karakter seti ve Tesseract modu
+
+### 🔄 Nozzle Kontrol Sistemi
+- **Step Motor Kontrolü**: Hassas açı kontrolü (0–360°), ivmeli hareket profili
+- **Homing**: Limit switch ile otomatik referans alma
+- **Hızlı Döndürme**: ±15°, ±45°, ±90°, ±180° preset butonları
+- **Direnç Ölçümü**:
+  - Anlık ve tekrarlı direnç testi
+  - ADC değeri, voltaj, direnç hesaplama
+  - Min, Max, Standart Sapma istatistikleri
+  - Ölçüm bazında detaylı tablo
+- **Diyot Testi**:
+  - Anlık ve tekrarlı akım geçiş testi
+  - Çoğunluk kararı (pass/fail)
+  - Otomatik düzeltme (180° döndürme)
+  - ADC istatistikleri ve ölçüm tablosu
+- **Hızlı Ölçüm**: Ana kontrol ekranında tek tuşla direnç/diyot okuma + sonuç HUD'u
+
+### 📋 Senaryo Sistemi
+- **15+ Adım Tipi**: Konum, OCR, pompa, nozzle, delay, ölçüm, koşullu test ve daha fazlası
+- **IF Blokları**: Koşullu direnç ve diyot testleri (PASS/FAIL branching)
+- **Pick & Test**: Otomatik al-test-yerleştir döngüsü
+- **Master Senaryo**: Birden fazla senaryoyu sıralı çalıştırma
+- **Gerçek Zamanlı Sonuç**: Büyük PASS ✅ / FAIL ❌ banner'ı ile belirgin test sonucu gösterimi
+- **Senaryo Kopyalama**: Mevcut senaryoyu tek tuşla çoğaltma
+- **Alt Adım Düzenleme**: PASS/FAIL branch'leri için yukarı/aşağı sıralama
+
+### ✅ Doğrulama Sistemi
+- **OCR Tabanlı Doğrulama**: Bileşen etiketlerini kamera ile okuyup doğrulama
+- **Eşik Değeri Ayarı**: Tesseract güven eşiği özelleştirme ve canlı önizleme
+- **HUD Entegrasyonu**: Sonuçlar ana ekranda kamera üstünde gerçek zamanlı gösterim
+- **Kutu Bazlı İlerleme**: Her bileşen analiz edilirken canlı sonuç kartları
+
+### 🔌 Otomatik Port Algılama
+- **GRBL Algılama**: Bağlanınca "Grbl" banner'ı ile doğrulama
+- **Nozzle Algılama**: PING/PONG protokolü ile doğrulama
+- **Udev Kuralları**: Kalıcı port ataması desteği
+
+---
+
+## 🏗 Sistem Mimarisi
+
+```
+┌──────────────────────────────────────────────────┐
+│                  Web Tarayıcı                     │
+│          (HTML + CSS + JavaScript)                │
+│              Socket.IO Client                    │
+└──────────────────────┬───────────────────────────┘
+                       │ HTTP / WebSocket
+┌──────────────────────┴───────────────────────────┐
+│              Flask + Socket.IO                    │
+│                  (app.py)                         │
+│  ┌─────────┐ ┌──────────┐ ┌──────────────────┐  │
+│  │  GRBL   │ │  Camera  │ │  Nozzle (Slave   │  │
+│  │ Driver  │ │ Manager  │ │  Arduino)        │  │
+│  └────┬────┘ └────┬─────┘ └────────┬─────────┘  │
+│       │           │                │             │
+└───────┼───────────┼────────────────┼─────────────┘
+        │           │                │
+   ┌────┴────┐ ┌────┴─────┐  ┌──────┴──────┐
+   │  GRBL   │ │ RPi Cam  │  │  Arduino    │
+   │ Arduino │ │ Module 3 │  │  (Slave)    │
+   │ (CNC)   │ │          │  │  Step Motor │
+   └─────────┘ └──────────┘  │  ADC Read   │
+                              │  Limit SW   │
+                              └─────────────┘
+```
+
+### Veri Akışı
+
+```
+Kullanıcı → Tarayıcı → Socket.IO → Flask Backend → Seri Port → Arduino/GRBL
+                ↑                         ↓
+                ← Socket.IO Events ← Gerçek Zamanlı Durum Bildirimleri
+```
+
+---
+
+## 🛠 Kurulum
+
+### Ön Gereksinimler
+
+- **Raspberry Pi 4/5** (4GB+ RAM önerilen)
+- **Python 3.11+**
+- **Raspberry Pi Camera Module 3**
+- **GRBL uyumlu CNC kontrol kartı** (Arduino Uno/Mega)
+- **Arduino** (Nozzle slave kontrolcü)
+
+### Kurulum Adımları
 
 ```bash
-# 1. Repoyu klonlayın
+# 1. Repoyu klonla
 git clone https://github.com/bitirici-ekip/ele495.git
 cd ele495
 
-# 2. Virtual environment oluşturun
+# 2. Sanal ortam oluştur ve aktifleştir
 python3 -m venv venv
 source venv/bin/activate
 
-# 3. Bağımlılıkları yükleyin
+# 3. Python bağımlılıklarını yükle
 pip install -r requirements.txt
 
-# 4. Tesseract OCR'ı yükleyin (Raspberry Pi OS)
-sudo apt install tesseract-ocr libtesseract-dev libleptonica-dev
+# 4. Tesseract OCR ve sistem bağımlılıklarını yükle
+sudo apt update
+sudo apt install tesseract-ocr tesseract-ocr-eng libleptonica-dev libtesseract-dev
 
-# 5. Arduino Slave firmware'ini yükleyin
-# arduino_stepper.ino dosyasını Nozzle Arduino'ya yükleyin (Arduino IDE ile)
-# ⚠️ DİKKAT: Bu firmware GRBL Arduino'ya DEĞİL, Slave Arduino'ya yüklenmelidir!
+# 5. Arduino firmware'ını yükle
+# arduino_stepper.ino dosyasını Arduino IDE ile Slave Arduino'ya yükleyin
 
-# 6. Uygulamayı başlatın
+# 6. Uygulama portlarını ayarla (isteğe bağlı — otomatik algılama mevcuttur)
+# Udev kuralları ile kalıcı port ataması:
+# /etc/udev/rules.d/99-usb-serial.rules
+
+# 7. Uygulamayı başlat
 python app.py
 ```
 
-### Uygulamaya Erişim
+Uygulama varsayılan olarak `http://0.0.0.0:5000` adresinde çalışır.
 
-Sunucu başlatıldıktan sonra tarayıcınızdan erişin:
+### Hızlı Başlatma
 
-```
-http://<raspberry-pi-ip>:5000
-```
-
-> **Not:** Varsayılan kullanıcı adı/şifre: `admin` / `admin` (Kimlik doğrulama şu anda devre dışıdır)
-
----
-
-## 📖 Özellikler
-
-### 🎯 Çekirdek Özellikler
-
-| Özellik | Açıklama |
-|---------|---------|
-| **GRBL Motor Kontrolü** | 3 eksenli (X, Y, Z) CNC motor kontrolü, otomatik port algılama |
-| **Canlı Kamera Yayını** | MJPEG üzerinden gerçek zamanlı kamera görüntüsü, PIP zoom desteği |
-| **OCR Yazı Algılama** | Tesseract tabanlı gerçek zamanlı yazı tanıma, IoU stabilizasyon |
-| **Otomatik Merkezleme** | 4 aşamalı akıllı merkezleme algoritması (kaba → hassas → doğrulama) |
-| **Vakum Pompası** | Pick & Place işlemi için kontrol edilebilir vakum sistemi |
-| **Nozzle Rotasyon** | Stepper motor ile hassas açı kontrolü, limit switch homing |
-| **Direnç Ölçümü** | Voltaj bölücü devresi ile ADC tabanlı direnç ölçümü |
-| **Diyot Testi** | Akım akışı yönü tespiti, otomatik 180° düzeltme |
-| **Senaryo Sistemi** | Çok adımlı otomasyon senaryoları, koşullu mantık (IF blokları) |
-| **Master Senaryolar** | Birden fazla senaryoyu zincirleyerek sıralı çalıştırma |
-| **Doğrulama (Verification)** | ROI tabanlı binary threshold analizi ile PCB kontrol |
-| **Kalibrasyon Sihirbazı** | Motor-kamera yön eşleştirme ve piksel/mm oranı hesaplama |
-
-### 🔄 Gerçek Zamanlı İletişim
-
-Sistem, **Flask-SocketIO** üzerinden tam çift yönlü WebSocket iletişimi sağlar:
-
-- 📊 Anlık durum güncellemeleri (pozisyon, GRBL durumu, FPS)
-- 📋 Konsol log mesajları
-- ⚡ OCR algılama sonuçları
-- 🎯 Auto-center ilerleme bildirileri
-- 🔬 Ölçüm sonuçları
-- 🎬 Senaryo durumu ve test sonuçları
-- 🔔 Hata bildirimleri (toast mesajlar)
-
----
-
-## 🌐 Web Arayüzü Sayfaları
-
-Sistem, **7 ana sekme** ile profesyonel bir tek sayfa web arayüzü sunar. Header'da tüm sekmeler arası geçiş yapılabilir. Header ayrıca motor bağlantı durumu, GRBL state göstergesi (Idle/Run/Home/Alarm), sistem çalışma süresi ve tema değiştirici içerir.
-
----
-
-### 🎮 1. Kontrol Paneli
-
-Ana çalışma ekranıdır. Üç sütunlu bir düzene sahiptir.
-
-#### Sol Sütun — Hızlı Aksiyonlar
-
-| Panel | Açıklama |
-|-------|---------|
-| **🎬 Hızlı Senaryo** | Dropdown ile senaryo seç ve tek tıkla çalıştır. Master senaryo desteği. Durdur butonu. |
-| **🎯 Hızlı Merkez** | Hedef kelimeyi yaz veya listelenmiş kısayollardan (TEST, CRB, SHN, AYD, MUS) seçerek merkezle |
-| **📍 Hızlı Konum** | Kayıtlı konumlardan seç ve "GİT" ile makineyi o konuma taşı |
-| **🔬 Hızlı Ölçüm** | Tek tıkla direnç ölçümü veya diyot testi yap (sonuç kamera altında gösterilir) |
-| **📋 Konsol** | Gerçek zamanlı log mesajları, G-code komut girişi (manuel GRBL kontrol) |
-
-#### Orta Sütun — Canlı Kamera
-
-- **MJPEG canlı yayın** — OCR kutuları ve crosshair ile annotated görüntü
-- **PIP Zoom** — Kaydırılabilir zoom (1x – 10x), görüntü merkezinde büyütme penceresi
-- **CAM/OCR FPS** — Kamera ve OCR işleme hız göstergesi
-- **LIVE badge** — Canlı yayın göstergesi
-- **Kamera ayarları** — Yakalama (OCR) ve yayın (ekran) çözünürlüğü presetleri
-- **Doğrulama HUD** — Son doğrulama sonuçlarını kamera üstünde gösterir
-- **Test Sonuç Banner** — Senaryo testlerinde büyük PASS/FAIL animasyonu
-
-#### Sağ Sütun — Kontrol Panelleri
-
-| Panel | Açıklama |
-|-------|---------|
-| **📍 Pozisyon** | X, Y, Z koordinatlarını gerçek zamanlı gösterir (mm cinsinden) |
-| **⚡ Aksiyonlar** | Pompa AÇ/KAPAT, GRBL Unlock, Reset, Sunucu Kapatma |
-| **🎮 Motor Kontrolü** | 8 yönlü XY hareket tuşları (↖↑↗◀HOME▶↙▼↘), Z tuşları (▲▼), adım boyutu seçici (0.1–50mm), mutlak Z hareketi |
-
----
-
-### 🔧 2. Kalibrasyon
-
-Motor hareket yönü ile kamera eksen yönünü eşleştiren interaktif kalibrasyon sihirbazıdır.
-
-#### Kalibrasyon Adımları
-
-1. **Motor & Yön Testleri** — Motor X+ ve Y+ yönüne hareket ettirilir. Kullanıcı ekrandaki hareket yönünü seçer (yukarı/aşağı/sol/sağ butonları)
-2. **Algoritma Sonucu** — Eksen swap, X ters-çevirme ve Y ters-çevirme otomatik hesaplanır
-3. **Piksel/mm Oranı** — X ve Y katsayıları otomatik hesaplanır ve gösterilir
-
-#### Gelişmiş Seçenekler
-
-- **Test Adımı Boyutu** — mm veya piksel cinsinden ayarlanabilir
-- **Manuel Eksen Ayarı** — Otomatik algoritmaya güvenmeyenler için swap ve negate seçenekleri
-- **Kalibrasyon Kaydetme** — Tüm ayarlar `config.json` dosyasına kaydedilebilir
-
----
-
-### ⚙️ 3. Ayarlar
-
-Sistem konfigürasyonlarının yönetildiği detaylı ayarlar sayfasıdır. Grid düzeninde 4 kart içerir:
-
-#### Motor & Kalibrasyon
-- Piksel → mm dönüşüm katsayıları (X, Y)
-- Hedef nokta (piksel koordinatları)
-- Feed Rate (mm/dk)
-- Tolerans (px) ve maksimum iterasyon
-- X/Y eksen yön invertleme
-
-#### OCR Ayarları
-- **Güven Eşiği** — Algılama filtresi (slider: 10–100)
-- **PSM Modu** — SINGLE_BLOCK (6), SPARSE_TEXT (11), AUTO (3)
-- **Whitelist** — Algılanacak karakter seti
-- **Min. Kelime** — Minimum kelime uzunluğu filtresi
-- **Kutu Büyüme** — OCR kutularının büyüme limiti
-- **Otomatik Home** — Açılışta home yapılıp yapılmayacağı
-
-#### OCR İzleme
-- Algılanan kelime sayısı
-- Hedef kelime durumu
-- Algılanan kelimeler listesi
-- Hata logu
-
-#### Sistem Bilgisi
-- Motor port, durum, kamera, GRBL state, çalışma süresi
-- Klavye kısayolları referansı (⬆⬇⬅➡ Motor, H Home, C Center, E Kapat)
-
----
-
-### 📍 4. Konumlar (Bases)
-
-Sık kullanılan makine koordinatlarını kaydetme ve yönetme sayfasıdır.
-
-#### Yeni Konum Ekle
-- **Konum Adı** — Tanımlayıcı isim (örn: Home, Pick1, Place1)
-- **X, Y, Z koordinatları** — Manuel giriş veya "Mevcut Konumu Çek" butonu ile otomatik doldurma
-- **Kaydet** — Konumları `bases.json` dosyasına yazar
-
-#### Kayıtlı Konumlar Listesi
-- Tüm konumlar kartlar halinde gösterilir
-- **GİT** — Akıllı Z sıralaması ile güvenli konum geçişi (önce Z yukarı → XY hareket → Z aşağı)
-- **Sil** — Konumu kaldır
-- Senaryolarda ve hızlı konum panelinde referans olarak kullanılır
-
----
-
-### 🎬 5. Senaryolar
-
-Otomatik iş akışları oluşturma ve yönetme sayfasıdır. İki bölümden oluşur:
-
-#### Standart Senaryolar (Sol Taraf)
-
-Adım adım otomasyon akışları oluşturmanıza olanak tanır:
-
-| Adım Tipi | Açıklama |
-|-----------|---------|
-| 📍 **Konuma Git** | Kayıtlı bir konuma hareket et |
-| 🎯 **Kelimeye Merkezle** | OCR ile hedef kelimeyi bul ve merkezle |
-| 👁️ **Doğruluk Kontrolü** | ROI tabanlı doğrulama çalıştır |
-| 💨 **Pompa AÇ** | Vakum pompasını aktifleştir |
-| 🛑 **Pompa KAPAT** | Vakum pompasını deaktif et |
-| ⏳ **Bekle** | Belirtilen süre kadar bekle (saniye) |
-| ↕️ **Z Konumuna Git** | Mutlak Z hareketi |
-| 🏠 **Home** | Ana makine homing |
-| 🔬 **Direnç Ölç (Anlık)** | Tek seferlik direnç ölçümü |
-| 💡 **Diyot Test Et (Anlık)** | Tek seferlik diyot testi |
-| 🔬 **Direnç Testi** | Tekrarlı direnç testi (istatistik) |
-| 💡 **Diyot Testi** | Tekrarlı diyot testi (çoğunluk kararı) |
-| 🔄 **Nozzle Açıya Git** | Nozzle'ı belirtilen açıya döndür |
-| 🏠 **Nozzle Home** | Nozzle homing |
-| 🔬 **IF Direnç Koşulu** | Direnç ölçüm sonucuna göre koşullu dallanma (PASS/FAIL adımları) |
-| 💡 **IF Diyot Koşulu** | Diyot test sonucuna göre koşullu dallanma (PASS/FAIL adımları) |
-
-#### IF Blokları (Koşullu Mantık)
-- **IF Direnç** — Hedef direnç değeri ve tolerans aralığı belirlenebilir. Ölçüm tolerans içindeyse PASS adımları, değilse FAIL adımları çalışır
-- **IF Diyot** — Akım geçip geçmediğine göre dallanma. Otomatik 180° düzeltme seçenegi
-- PASS ve FAIL blokları içinde scroll butonları ile adım sıralama desteği
-
-#### Master Senaryolar (Sağ Taraf)
-
-Birden fazla standart senaryoyu sıralı olarak çalıştırır:
-- Senaryo sırasını düzenle (yukarı/aşağı)
-- Tek tıkla tüm zinciri başlat
-- Üretim hattı otomasyonu için ideal
-
----
-
-### 🔧 6. Nozzle Kontrolü
-
-Slave Arduino üzerinden nozzle step motor ve ölçüm yönetimi. Üç sütunlu dashboard düzeni.
-
-#### Sol Sütun — Bağlantı & Motor
-
-| Panel | Açıklama |
-|-------|---------|
-| **🔌 Bağlantı** | Port seçimi, bağlan/kopar butonları, bağlantı durumu göstergesi |
-| **🔄 Motor Kontrol** | Büyük açı göstergesi (animasyonlu), Home butonu, hedef açıya git, hızlı döndürme butonları (-180° ile +180° arasında preset'ler) |
-
-#### Orta Sütun — Ölçümler
-
-| Panel | Açıklama |
-|-------|---------|
-| **🔬 Direnç Ölçümü** | Anlık direnç ölçümü (ADC, voltaj, Ω göstergesi), 10 ölçümlük tekrarlı test (istatistiksel sonuç), ilerleme noktaları |
-| **💡 Diyot Testi** | Anlık diyot test (akım geçiyor/geçmiyor), 10 ölçümlük tekrarlı test (6/10 çoğunluk kararı), otomatik 180° düzeltme seçeneği |
-
-#### Sağ Sütun — Ayarlar
-
-Tüm nozzle parametreleri yapılandırılabilir:
-- **Motor:** Adım/devir, mikro adımlama (1-16x), min/max açı limitleri
-- **Hız:** Normal hız, homing hızı, ivme adımı ve başlangıç hızı (µs cinsinden)
-- **Pinler:** Limit switch, analog pin, homing yönü, geri yön
-- **Ölçüm:** Bilinen R (Ω), ADC örnekleme sayısı, diyot eşik değeri, test sayısı, test aralığı
-
----
-
-### 👁️ 7. Doğrulama (Verification)
-
-PCB üzerindeki bileşen varlığını binary threshold analizi ile doğrulayan sayfa. Üç sütunlu düzen.
-
-#### Sol Sütun — Ayarlar & ROI Kutuları
-- **Konum seçici** — Doğrulama yapılacak kayıtlı konuma git
-- **Threshold (Eşik)** — Binary threshold değeri (0–255 slider)
-- **Gösterim Eşiği** — Bu yüzdenin altındaki değerler "BOŞ" olarak gösterilir
-- **Kutu Editörü** — ROI kutuları ekleme, silme, boyut/konum düzenleme
-
-#### Orta Sütun — Kamera & Kutu Çizim
-- Temiz (annotasyonsuz) kamera görüntüsü
-- Sürükle-bırak ile ROI kutusu konumlandırma
-- Boyutlandırma tutamakları
-
-#### Sağ Sütun — Sonuçlar & Önizleme
-- **Sonuçlar paneli** — Her kutunun doluluk yüzdesi
-- **Threshold önizleme** — Binary threshold uygulanmış görüntü
-- Her kutu için ayrı threshold görüntüsü base64 olarak gönderilir
-
----
-
-## 🔌 Donanım Mimarisi
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Raspberry Pi (Ana Bilgisayar)             │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────────┐  │
-│  │  Flask Web   │  │  Picamera2   │  │  Tesseract OCR     │  │
-│  │  Sunucusu    │  │  Kamera      │  │  Yazı Algılama     │  │
-│  │  (SocketIO)  │  │  Modülü      │  │                    │  │
-│  └──────┬───────┘  └──────┬───────┘  └────────┬───────────┘  │
-│         │                 │                    │              │
-│         │    USB Seri     │     Frame          │    OCR       │
-│    ┌────┴────┐      ┌─────┴──────┐       ┌────┴────┐        │
-│    │  GRBL   │      │  MJPEG     │       │  Auto   │        │
-│    │ Driver  │      │  Stream    │       │ Center  │        │
-│    └────┬────┘      └────────────┘       └─────────┘        │
-│         │                                                    │
-└─────────┼────────────────────────────────────────────────────┘
-          │ USB (/dev/ttyUSB* veya /dev/ttyACM*)
-          │
-    ┌─────┴──────────────────────────────────────────┐
-    │                                                 │
-┌───┴───────────┐                          ┌──────────┴──────────┐
-│  Arduino #1   │                          │  Arduino #2         │
-│  GRBL Firmware│                          │  Slave Firmware     │
-│  (CNC Kontrol)│                          │  (arduino_stepper)  │
-│               │                          │                     │
-│  • X Motoru   │                          │  • Nozzle Stepper   │
-│  • Y Motoru   │                          │  • A1: ADC Direnç   │
-│  • Z Motoru   │                          │  • D9: Limit Switch │
-│  • Pompa Rölesi│                         │                     │
-└───────────────┘                          └─────────────────────┘
+```bash
+# Direkt çalıştırma
+source venv/bin/activate && python app.py
 ```
 
-### Port Algılama (Otomatik)
-
-Sistem açılışta tüm USB seri portları tarar:
-- **GRBL Arduino** → Bağlanınca `Grbl` banner'ı gönderir
-- **Nozzle Arduino** → `SLAVE_READY` veya `PING`→`PONG` yanıtı verir
-
-Port isimleri udev kuralları ile sabitlenebilir (örn: `/dev/arduino_grbl`, `/dev/arduino_slave`).
-
 ---
 
-## 📡 API Referansı
+## 🖥 Kullanım
 
-### REST Endpoints
+Tarayıcınızdan `http://<raspberry-pi-ip>:5000` adresine gidin.
 
-| Method | Endpoint | Açıklama |
-|--------|----------|---------|
-| `GET` | `/` | Ana sayfa (index.html) |
-| `GET` | `/video_feed` | MJPEG canlı kamera yayını (annotated) |
-| `GET` | `/video_feed_raw` | MJPEG temiz kamera yayını (doğrulama için) |
-| `GET` | `/api/status` | Sistem durumu (JSON) |
-| `POST` | `/api/move` | Manuel motor hareketi `{"x": float, "y": float}` |
-| `POST` | `/api/move_z_absolute` | Mutlak Z hareketi `{"z": float}` |
-| `POST` | `/api/home` | Home komutu (tüm eksenleri sıfırla) |
-| `POST` | `/api/auto_center` | Otomatik merkezleme `{"target_word": "TEST"}` |
-| `POST` | `/api/pump` | Pompa kontrolü `{"state": true/false}` |
-| `GET` | `/api/config` | Konfigürasyonu getir |
-| `GET/POST` | `/api/bases` | Konumları listele / yeni ekle |
-| `DELETE` | `/api/bases/<name>` | Konumu sil |
-| `POST` | `/api/goto_base` | Konuma git `{"name": "Pick1"}` |
+### İlk Kullanım
+1. **Otomatik Bağlantı**: Uygulama açılırken GRBL ve Nozzle Arduino'ları otomatik algılar
+2. **Home Döngüsü**: Bağlantı kurulduğunda otomatik home yapılır
+3. **Konum Kaydetme**: İstenen konumlara gidin ve **Konumlar** sekmesinden kaydedin
+4. **Senaryo Oluşturma**: Senaryolar sekmesinden otomasyon adımlarınızı tanımlayın
 
-### SocketIO Olayları
+### Klavye Kısayolları
 
-| Olay | Yön | Açıklama |
-|------|-----|---------|
-| `status_update` | Server → Client | Pozisyon, FPS, OCR verileri |
-| `console_log` | Server → Client | Konsol mesajları |
-| `connection_status` | Server → Client | Motor/kamera bağlantı durumu |
-| `auto_center_status` | Server → Client | Merkezleme ilerleme güncellemesi |
-| `scenario_status` | Server → Client | Senaryo çalışma durumu |
-| `scenario_test_result` | Server → Client | IF blok test sonucu (PASS/FAIL) |
-| `resistance_result` | Server → Client | Anlık direnç ölçüm sonucu |
-| `diode_result` | Server → Client | Anlık diyot test sonucu |
-| `verification_update` | Server → Client | Doğrulama ilerleme ve sonuçları |
-| `grbl_alarm` | Server → Client | GRBL alarm durumu bildirimi |
-| `toast` | Server → Client | Hata/uyarı bildirim mesajı |
-
----
-
-## ⌨️ Klavye Kısayolları
-
-| Tuş | Aksiyon |
-|-----|---------|
+| Tuş | İşlev |
+|-----|-------|
 | `↑` `↓` `←` `→` | Motor XY hareketi |
-| `H` | Home (tüm eksenleri sıfırla) |
-| `C` | Otomatik merkezleme başlat |
-| `E` | Acil durdurma |
+| `W` / `S` | Z yukarı / aşağı |
+| `Q` / `E` | Adım boyutu azalt / artır |
+| `H` | Home |
+| `C` | Auto Center |
+| `Space` | Pompa aç/kapat |
+| `PageUp` / `PageDown` | Z yukarı / aşağı |
 
 ---
 
-## 📂 Proje Yapısı
+## 📑 Sayfa ve Sekmeler
+
+### 🎮 Kontrol Sekmesi (Ana Sayfa)
+
+Ana kontrol merkezi — 3 sütunlu düzen:
+
+**Sol Panel:**
+- 🎬 **Hızlı Senaryo Başlatıcı** — Dropdown ile senaryo/master senaryo seçip tek tuşla çalıştırma
+- 🎯 **Hızlı Merkezleme** — Kelime gir ve merkeze taşı, preset butonlar (TEST, CRB, SHN, AYD, MUS)
+- 📍 **Hızlı Konuma Git** — Kayıtlı konumlara dropdown ile tek tuşla git
+- 🔬 **Hızlı Ölçüm** — Direnç ve Diyot butonları
+- 📋 **Konsol** — G-code gönderme ve sistem log'ları
+
+**Orta Panel (Kamera):**
+- 📹 Canlı kamera görüntüsü (MJPEG stream)
+- 🔍 OCR bounding box overlay
+- 🔎 PIP Zoom slider (1x–10x)
+- ⚙️ Çözünürlük ayarları popup'ı
+- 📊 FPS monitörü (Kamera + OCR)
+- ✅ Doğrulama sonuçları HUD (kamera üstü)
+- 📦 **Ölçüm Sonuç Kutuları** — Kamera altında direnç/diyot sonuçları (senaryo sırasında da görünür)
+- 🎯 **Test Sonuç Banner'ı** — Büyük, animasyonlu PASS ✅ / FAIL ❌ gösterimi
+
+**Sağ Panel:**
+- 📍 Gerçek zamanlı X/Y/Z koordinatları
+- ⚡ Aksiyon butonları (Pompa, Unlock, Reset, Sunucu Kapat)
+- 🎮 Motor kontrol yön tuşları (8 yön + Z)
+- 📏 Adım boyutu seçici (0.1 – 50mm)
+- ↕️ Mutlak Z hedef hareketi
+
+---
+
+### 🔧 Kalibrasyon Sekmesi
+
+Motor yön ve piksel/mm kalibrasyonu:
+
+- **Motor Yön Testi**: X+ ve Y+ yönlerinde hareket → kamerada hangi yöne gittiğini seç
+- **Otomatik Hesaplama**: Eksen swap, X ters, Y ters otomatik belirleme
+- **Piksel/mm Oranı**: X ve Y çarpanlarını görüntüleme ve kaydetme
+- **Manuel Override**: İleri düzey kullanıcılar için eksen ayarları
+
+---
+
+### 📋 Senaryolar Sekmesi
+
+İki bölümlü düzen — **Standart Senaryolar** ve **Master Senaryolar**:
+
+- **Senaryo Oluşturucu**: Ad verin, adımları ekleyin, kaydedin
+- **15+ Adım Tipi**: Konum, OCR, pompa, nozzle, ölçüm, koşullu test
+- **IF Blokları**: Direnç ve diyot koşullu testler ile dallanma (PASS/FAIL alt adımları)
+- **Adım Düzenleme**: Ekleme, düzenleme, silme, yukarı/aşağı taşıma, aralara ekleme
+- **Senaryo Kopyalama**: Mevcut senaryoyu tek tuşla çoğalt
+- **Master Senaryo**: Birden fazla senaryoyu sıralı çalıştırma
+- **Canlı İlerleme**: Çalışan senaryonun her adımı gerçek zamanlı izleme
+
+---
+
+### 🔄 Nozzle Sekmesi
+
+3 sütunlu profesyonel dashboard:
+
+**Sol Sütun — Bağlantı & Motor:**
+- Seri port bağlantısı (bağlan/kopar)
+- Büyük açı göstergesi (animasyonlu gradient arkaplan)
+- Home butonu + hedef açı girişi
+- Hızlı döndürme butonları (±15°, ±45°, ±90°, ±180°)
+
+**Orta Sütun — Ölçümler:**
+- 🔬 **Direnç Ölçümü**: Anlık + tekrarlı test, detaylı tablo, istatistikler
+- 💡 **Diyot Testi**: Anlık + tekrarlı test, otomatik düzeltme (180° döndür)
+
+**Sağ Sütun — Ayarlar:**
+- Motor parametreleri (adım/devir, mikro adımlama, min/max açı)
+- Hız ayarları (normal, homing, ivme)
+- Pin yapılandırması ve ölçüm parametreleri
+
+---
+
+### 👁️ Doğrulama Sekmesi
+
+Bileşen yerleşim doğrulaması:
+
+- Bileşen listesi tanımlama (isim + beklenen eşleşme oranı)
+- Base konum seçimi (doğrulama yapılacak konum)
+- Threshold canlı önizleme (kamera üstünde)
+- Kutu bazlı gerçek zamanlı ilerleme gösterimi
+- Her bileşen için PASS ✅ / FAIL ❌ sonuç kartları
+
+---
+
+### ⚙️ Ayarlar Sekmesi
+
+Sistem yapılandırması — 4 kart düzeni:
+
+- **🎛️ Motor & Kalibrasyon**: Piksel/mm oranları, hedef nokta, feed rate, tolerans, yön ters çevirme
+- **🔍 OCR Ayarları**: Güven eşiği, PSM modu, whitelist, min kelime uzunluğu, kutu büyüme
+- **📊 OCR İzleme**: Algılanan kelime sayısı, hedef durumu, hata listesi
+- **ℹ️ Sistem**: Motor port, GRBL state, kamera durumu, çalışma süresi, kısayollar
+
+---
+
+### 📍 Konumlar Sekmesi
+
+Kayıtlı konum (base) yönetimi:
+
+- Yeni konum ekleme (isim + X, Y, Z koordinatları)
+- Mevcut konumu çek butonu (anlık pozisyonu al)
+- Konum düzenleme (inline edit)
+- Konum silme (onay ile)
+- Konuma git butonu (akıllı Z sıralaması)
+
+---
+
+## 🎬 Senaryo Sistemi Detayları
+
+### Desteklenen Adım Tipleri
+
+| Tip | Açıklama | Parametreler |
+|-----|----------|-------------|
+| `goto_base` | Kayıtlı konuma git | Konum adı |
+| `auto_center` | Kelimeye otomatik merkezle (OCR) | Hedef kelime |
+| `pump_on` | Vakum pompası aç | — |
+| `pump_off` | Vakum pompası kapat | — |
+| `delay` | Bekleme süresi | Saniye |
+| `move_z` | Z ekseni mutlak hareketi | Z (mm) |
+| `home` | GRBL Home pozisyonuna git | — |
+| `nozzle_goto` | Nozzle'ı belirli açıya döndür | Açı (0–180°) |
+| `nozzle_home` | Nozzle homing | — |
+| `resistance_read` | Tek seferlik anlık direnç ölçümü | — |
+| `diode_read` | Tek seferlik anlık diyot testi | — |
+| `resistance_test` | Direnç testi (tekrarlı) | — |
+| `diode_test` | Diyot testi (tekrarlı) | — |
+| `verify` | Doğrulama kontrolü | — |
+| `if_resistance` | Koşullu direnç testi (IF bloku) | Hedef Ω, tolerans %, PASS/FAIL alt adımları |
+| `if_diode` | Koşullu diyot testi (IF bloku) | Beklenen durum, PASS/FAIL alt adımları |
+
+### IF Blokları (Koşullu Test)
+
+IF blokları, test sonucuna göre farklı adım dizilerinin çalıştırılmasını sağlar:
+
+```
+IF Direnç(hedef=10kΩ, tolerans=±10%)
+  ├── ✅ PASS (9kΩ – 11kΩ arası):
+  │   ├── Konuma Git: "PASS KUTUSU"
+  │   ├── Pompa Kapat
+  │   └── ...
+  └── ❌ FAIL (aralık dışı):
+      ├── Konuma Git: "FAIL KUTUSU"
+      ├── Nozzle 180° Döndür
+      └── ...
+```
+
+### Test Sonuç Gösterimi
+
+Senaryo sırasında yapılan her ölçümde:
+1. **Ölçüm Kutuları**: Kamera altında direnç/diyot değerleri (küçük kutular)
+2. **PASS/FAIL Banner**: Ekranın ortasında büyük, animasyonlu sonuç gösterimi
+   - ✅ **PASS** — Yeşil gradient arka plan
+   - ❌ **FAIL** — Kırmızı gradient arka plan
+   - 📊 **Ölçüm** — Mavi gradient (koşulsuz düz ölçüm)
+
+---
+
+## 🔌 API Referansı
+
+### Motor Kontrol
+| Endpoint | Yöntem | Açıklama |
+|----------|--------|----------|
+| `/api/move` | POST | Göreceli motor hareketi `{x, y, z}` |
+| `/api/move_z_absolute` | POST | Mutlak Z hareketi `{z}` |
+| `/api/home` | POST | Homing döngüsü |
+| `/api/pump` | POST | Pompa kontrolü `{state: true/false}` |
+| `/api/grbl_status` | GET | GRBL durum sorgula |
+
+### Kamera & OCR
+| Endpoint | Yöntem | Açıklama |
+|----------|--------|----------|
+| `/video_feed` | GET | MJPEG video akışı (annotasyonlu) |
+| `/video_feed_raw` | GET | MJPEG video akışı (temiz) |
+| `/api/camera/resolution` | POST | Çözünürlük ayarla `{width, height}` |
+| `/api/auto_center` | POST | Otomatik merkezleme `{target_word}` |
+| `/api/status` | GET | Tüm sistem durumu |
+
+### Konumlar
+| Endpoint | Yöntem | Açıklama |
+|----------|--------|----------|
+| `/api/bases` | GET/POST | Konumları listele/kaydet |
+| `/api/bases/<name>` | DELETE | Konum sil |
+| `/api/goto_base` | POST | Konuma git `{name}` |
+
+### Nozzle
+| Endpoint | Yöntem | Açıklama |
+|----------|--------|----------|
+| `/api/nozzle/connect` | POST | Nozzle Arduino bağlantısı |
+| `/api/nozzle/disconnect` | POST | Bağlantıyı kes |
+| `/api/nozzle/home` | POST | Nozzle homing |
+| `/api/nozzle/goto` | POST | Belirli açıya git `{angle}` |
+| `/api/nozzle/read_resistance` | GET | Anlık direnç oku |
+| `/api/nozzle/read_diode` | GET | Anlık diyot testi |
+| `/api/nozzle/resistance_test` | POST | Tekrarlı direnç testi |
+| `/api/nozzle/diode_test` | POST | Tekrarlı diyot testi |
+| `/api/nozzle/status` | GET | Nozzle durumu |
+| `/api/nozzle/config` | GET/POST | Nozzle ayarları |
+
+### Senaryo
+| Endpoint | Yöntem | Açıklama |
+|----------|--------|----------|
+| `/api/scenarios` | GET/POST | Senaryo listele/kaydet |
+| `/api/scenarios/<name>` | DELETE | Senaryo sil |
+| `/api/scenarios/run` | POST | Senaryo çalıştır |
+| `/api/scenarios/stop` | POST | Senaryoyu durdur |
+| `/api/master_scenarios` | GET/POST | Master senaryo listele/kaydet |
+| `/api/master_scenarios/run` | POST | Master senaryo çalıştır |
+
+### Doğrulama
+| Endpoint | Yöntem | Açıklama |
+|----------|--------|----------|
+| `/api/verification/config` | GET/POST | Doğrulama ayarları |
+| `/api/verification/run` | POST | Doğrulama çalıştır |
+
+### Yapılandırma
+| Endpoint | Yöntem | Açıklama |
+|----------|--------|----------|
+| `/api/config` | GET/POST | Sistem konfigürasyonu |
+| `/api/calibration` | POST | Kalibrasyon kaydet |
+
+### Socket.IO Event'leri
+
+| Event | Yön | Açıklama |
+|-------|-----|----------|
+| `status_update` | Server→Client | Motor, kamera, OCR durumu |
+| `motor_update` | Server→Client | Motor pozisyon güncellemesi |
+| `scenario_update` | Server→Client | Senaryo ilerleme durumu |
+| `scenario_test_result` | Server→Client | Ölçüm sonucu (direnç/diyot) |
+| `auto_center_update` | Server→Client | Merkezleme durumu |
+| `verification_update` | Server→Client | Doğrulama sonuçları |
+| `nozzle_status` | Server→Client | Nozzle durum güncellemesi |
+| `log_message` | Server→Client | Konsol log mesajları |
+| `error_toast` | Server→Client | Hata bildirimleri |
+
+---
+
+## 🔧 Donanım Gereksinimleri
+
+| Bileşen | Model/Özellik |
+|---------|---------------|
+| 🖥️ **Bilgisayar** | Raspberry Pi 4/5 (4GB+ RAM önerilen) |
+| 📷 **Kamera** | Raspberry Pi Camera Module 3 |
+| ⚙️ **CNC Kontrolcü** | GRBL uyumlu kart (Arduino Uno/Mega) |
+| 🔧 **Nozzle Kontrolcü** | Arduino (Slave) — Step motor sürücü |
+| 🔌 **Step Motor** | NEMA 17 veya benzeri (nozzle için) |
+| 💨 **Vakum Pompası** | 12V/24V vakum pompası + röle |
+| 🔘 **Limit Switch** | Nozzle homing için mekanik switch |
+| 📏 **ADC** | Arduino analog giriş (direnç/diyot ölçümü) |
+
+### Bağlantı Şeması
+
+```
+Raspberry Pi
+  ├── USB → Arduino (GRBL CNC) — Motor X, Y, Z + Pompa
+  ├── USB → Arduino (Slave)    — Nozzle Step Motor + ADC + Limit Switch
+  └── CSI → RPi Camera Module 3
+```
+
+---
+
+## ⚙️ Yapılandırma
+
+Uygulama tüm ayarlarını JSON dosyalarında saklar. Web arayüzünden yapılan tüm değişiklikler **otomatik olarak kaydedilir**.
+
+### Yapılandırma Dosyaları
+
+| Dosya | Açıklama |
+|-------|----------|
+| `config.json` | Motor, kamera, OCR, kalibrasyon ayarları |
+| `bases.json` | Kayıtlı konumlar (Base Positions) |
+| `scenarios.json` | Standart senaryo tanımları |
+| `master_scenarios.json` | Master senaryo tanımları |
+| `verification.json` | Doğrulama bileşen listesi ve ayarları |
+
+---
+
+## 📁 Proje Yapısı
 
 ```
 ele495/
-├── app.py                    # Ana uygulama (Flask + SocketIO sunucu, ~4400 satır)
-│                             #   ├── Config — Sistem konfigürasyonu
-│                             #   ├── PNPDriver — GRBL motor sürücüsü
-│                             #   ├── NozzleController — Nozzle + ölçüm kontrolü
-│                             #   ├── CameraManager — Kamera + OCR yönetimi
-│                             #   ├── auto_center() — Otomatik merkezleme algoritması
-│                             #   ├── run_verification() — Doğrulama motoru
-│                             #   ├── run_scenario() — Senaryo çalıştırma motoru
-│                             #   └── Flask Routes — REST API & SocketIO handlers
-│
-├── pi_controller.py          # Raspberry Pi spesifik kontroller (ArduinoSlave, MotorController, vb.)
-├── arduino_stepper.ino       # Arduino Slave firmware (Generic Slave mimarisi)
-│
+├── app.py                  # Ana Flask sunucu — GRBL sürücü, Nozzle kontrolcü,
+│                           # Kamera yöneticisi, OCR, Senaryo motoru, REST API
+├── pi_controller.py        # Raspberry Pi kontrolcü (yardımcı modül)
+├── arduino_stepper.ino     # Arduino Slave firmware (step motor, ADC, limit switch)
 ├── templates/
-│   ├── index.html            # Ana web arayüzü (7 sekmeli SPA, ~1560 satır)
-│   └── login.html            # Giriş sayfası
-│
+│   ├── index.html          # Ana web arayüzü (tek sayfa uygulama — 7 sekme)
+│   └── login.html          # Giriş sayfası
 ├── static/
-│   ├── app.js                # Frontend mantığı (SocketIO, UI, senaryolar, ~3000 satır)
-│   └── style.css             # Tema, responsive tasarım, animasyonlar
-│
-├── config.json               # Sistem konfigürasyonu (persisted)
-├── bases.json                # Kayıtlı konumlar
-├── scenarios.json            # Standart senaryolar
-├── master_scenarios.json     # Master senaryolar
-├── verification.json         # Doğrulama ayarları ve ROI kutuları
-├── requirements.txt          # Python bağımlılıkları
-├── .gitignore                # Git ignore kuralları
-└── README.md                 # Bu dosya
+│   ├── app.js              # Frontend JavaScript (Socket.IO, UI mantığı)
+│   └── style.css           # CSS stil dosyası (dark/light tema)
+├── config.json             # Sistem yapılandırması
+├── bases.json              # Kayıtlı konumlar
+├── scenarios.json          # Senaryo tanımları
+├── master_scenarios.json   # Master senaryo tanımları
+├── verification.json       # Doğrulama ayarları
+├── requirements.txt        # Python bağımlılıkları
+├── .gitignore              # Git ignore kuralları
+└── README.md               # Bu dosya
 ```
-
----
-
-## 🔧 Konfigürasyon
-
-Tüm ayarlar `config.json` dosyasında saklanır. Web arayüzünden de düzenlenebilir.
-
-### Önemli Parametreler
-
-```json
-{
-  "pixel_to_mm_x": 0.02,          // Piksel → mm X katsayısı
-  "pixel_to_mm_y": 0.02,          // Piksel → mm Y katsayısı
-  "feed_rate": 1000,               // Motor hızı (mm/dk)
-  "camera_width": 1920,            // Kamera yakalama genişliği
-  "camera_height": 1080,           // Kamera yakalama yüksekliği
-  "auto_center_tolerance": 5,      // Merkezleme toleransı (px)
-  "auto_center_max_iter": 10,      // Maksimum iterasyon sayısı
-  "ocr_confidence": 40,            // OCR güven eşiği
-  "ocr_psm_mode": 6,               // Tesseract PSM modu
-  "nozzle_known_resistance": 10000, // Voltaj bölücü referans direnci (Ω)
-  "nozzle_diode_threshold": 500,    // Diyot ADC eşik değeri
-  "nozzle_microstepping": 16        // Mikro adımlama faktörü
-}
-```
-
----
-
-## 🔬 Arduino Slave Protokolü
-
-Nozzle Arduino, **Generic Slave** mimarisinde çalışır. Komutlar seri port üzerinden `\n` ile sonlandırılarak gönderilir:
-
-| Komut | Yanıt | Açıklama |
-|-------|-------|---------|
-| `PING` | `OK:PONG` | Bağlantı testi |
-| `STEP <count> <dir> <spd> <acc_s> <acc_st>` | `OK:STEP_DONE` | Adım hareketi |
-| `STEPG <count> <dir> <spd> <acc_s> <acc_st> <guard_pin>` | `OK:STEP_DONE` veya `OK:ESTOP` | Korumalı adım (limit switch ile) |
-| `AHOME <dir> <back> <spd> <slow> <backoff> <clearance> <pin>` | `OK:HOMED` | Otonom homing |
-| `AROTATE <count> <dir> <spd> <acc_s> <acc_st> <pin>` | `OK:DONE` veya `OK:ESTOP` | Otonom dönüş |
-| `EN <0\|1>` | `OK` | Motor enable/disable |
-| `AREAD <pin>` | `OK:<değer>` | Analog okuma |
-| `MULTI_AREAD <pin> <count>` | `OK:<ortalama>` | Çoklu analog okuma (ortalama) |
-| `DREAD <pin>` | `OK:<değer>` | Dijital okuma |
-| `DWRITE <pin> <val>` | `OK` | Dijital yazma |
 
 ---
 
@@ -501,20 +540,24 @@ Nozzle Arduino, **Generic Slave** mimarisinde çalışır. Komutlar seri port ü
 1. Bu repoyu fork edin
 2. Feature branch oluşturun (`git checkout -b feature/yeni-ozellik`)
 3. Değişikliklerinizi commit edin (`git commit -m 'Yeni özellik eklendi'`)
-4. Branch'i push edin (`git push origin feature/yeni-ozellik`)
+4. Branch'e push edin (`git push origin feature/yeni-ozellik`)
 5. Pull Request açın
 
 ---
 
-<div align="center">
+## 👨‍💻 Ekip Üyeleri
 
-### 🎓 ELE495 — Bitirme Projesi
+- Şahin Yalgun
+- Egemen Çorbacı
+- Mustafa Anıl Işık
+- Aydın Eralp Sırmalı
 
-**Bitirici Ekip** tarafından geliştirilmiştir.
+**ELE495 Bitirme Projesi — Bitirici Ekip**
 
 ---
 
-*Bu proje, Pick & Place CNC makinelerinin web tabanlı kontrolü için açık kaynaklı bir çözüm sunmaktadır.*
+## 📄 Lisans
 
-</div>
-]]>
+Bu proje **ELE495 Elektronik Mühendisliği Bitirme Projesi** kapsamında geliştirilmiştir.
+
+© 2026 Bitirici Ekip — Tüm hakları saklıdır.
