@@ -203,7 +203,8 @@ class Config:
     VERIFICATION = {
         'boxes': [],
         'base_name': '',
-        'threshold': 127
+        'threshold': 127,
+        'display_threshold': 5
     }
 
     def to_dict(self):
@@ -529,6 +530,10 @@ def add_error(message, level="ERROR"):
 # ═════════════════════════════════════════════════════════════════════════════
 
 # Algılanan portlar burada saklanır
+# UYARI (GELİŞTİRİCİ İÇİN) - PORTLAR DİNAMİKTİR:
+# USB port isimleri (ttyUSB0, ttyUSB1, vb.) sistem her açıldığında DEĞİŞEBİLİR.
+# Hangi portun kime ait olduğunu bulmak için cihazları tek tek bağlayıp kod loglarına bakabilirsiniz.
+# arduino_stepper.ino KESİNLİKLE "Nozzle (Stepper) Arduino'suna" YÜKLENMELİDİR. GRBL kartına yüklemeyin.
 detected_ports = {"grbl": None, "nozzle": None}
 
 def detect_ports():
@@ -701,6 +706,7 @@ class PNPDriver:
 
             # Başlangıç komutları
             self.send("$X")    # Alarm kilidini aç
+            self.send("$10=0") # WPos raporlaması için
             self.send("G21")   # Milimetre modu
             self.send("G90")   # Mutlak koordinat
             self.send("G94")   # Feed rate modu
@@ -830,6 +836,8 @@ class PNPDriver:
         log.info("Home başlatılıyor ($H)...")
         if self.send("$H", timeout=60):
             log.info("Home tamamlandı.")
+            # Home tamamlandıktan sonra çalışma koordinatlarını 0,0,0'a çek
+            self.send("G10 P0 L20 X0 Y0 Z0")
             self.send("G92 X0 Y0 Z0")
             self.current_x = 0.0
             self.current_y = 0.0
@@ -1129,9 +1137,12 @@ class NozzleController:
             self._motor_enable(True)
             time.sleep(0.01)
 
-            cmd = (f"STEPG {steps} {direction} {config.NOZZLE_NORMAL_SPEED_US} "
+            # AROTATE <count> <dir> <speed> <accel_steps> <accel_start> <limit_pin>
+            cmd = (f"AROTATE {steps} {direction} {config.NOZZLE_NORMAL_SPEED_US} "
                    f"{config.NOZZLE_ACCEL_STEPS} {config.NOZZLE_ACCEL_START_US} "
                    f"{config.NOZZLE_LIMIT_PIN}")
+            
+            log.info(f"Otonom Dönüş Komutu Gönderiliyor: {cmd}")
             response, success = self._send_cmd(cmd, timeout=30)
 
             time.sleep(0.05)
@@ -1141,13 +1152,16 @@ class NozzleController:
                 if response == "ESTOP":
                     self.is_homed = False
                     return 0, self.current_angle, "⚠️ ACİL DURDURMA! Limit switch tetiklendi."
-                else:
+                elif response == "DONE":
                     self.current_angle += degrees
                     msg = f"{degrees:+.1f}° hareket"
                     if clamped:
                         msg += " (sınıra kırpıldı)"
                     return degrees, self.current_angle, msg
+                else:
+                    return 0, self.current_angle, f"Beklenmeyen yanıt: {response}"
             else:
+                # Timeout veya hata durumunda cihaz çalışıyor olabilir.
                 return 0, self.current_angle, f"Hata: {response}"
 
     def goto_angle(self, target: float):
@@ -1180,11 +1194,6 @@ class NozzleController:
             homing_speed = config.NOZZLE_HOMING_SPEED_US
             limit_pin = config.NOZZLE_LIMIT_PIN
 
-            def _read_limit():
-                """Limit switch oku. True = basılı (LOW=0)."""
-                resp, ok = self._send_cmd(f"DREAD {limit_pin}", timeout=5)
-                return ok and resp == "0"
-
             try:
                 # SERİ PORT TEMİZLİĞİ — uzun süre boşta kaldıysa buffer temizle
                 if self.serial and self.serial.is_open:
@@ -1199,82 +1208,36 @@ class NozzleController:
                     return False, "Arduino yanıt vermiyor (PING başarısız)!"
                 time.sleep(0.05)
 
-                # MOTOR ENABLE — enable komutunu gönder ve doğrula
-                en_resp, en_ok = self._send_cmd("EN 0", timeout=5)
-                if not en_ok:
-                    log.warning(f"Motor enable yanıtı beklenmedik: {en_resp}")
+                # MOTOR ENABLE — enable komutunu gönder
+                self._send_cmd("EN 0", timeout=5)
                 time.sleep(0.15)  # Motor enable'ın oturması için bekle
-                if _read_limit():
-                    log.info("Nozzle: Zaten limit switch üzerinde, geri çekiliniyor...")
-                    backoff_pre = int(10.0 * steps_per_deg)
-                    self._send_cmd(f"STEP {backoff_pre} {homing_back_dir} {homing_speed} 0 {homing_speed}", timeout=15)
-                    time.sleep(0.5)
-                    if _read_limit():
-                        self._motor_enable(False)
-                        return False, "Limit switch'ten uzaklaşılamadı!"
 
-                # AŞAMA 1: Limit switch'e hızlı yaklaşma
-                max_steps = int(400 * steps_per_deg)
-                batch_size = 50
-                found = False
-                steps_taken = 0
+                backoff_steps = int(5.0 * steps_per_deg)
+                clearance_steps = int(3.0 * steps_per_deg)
+                slow_speed = homing_speed * 2
 
-                while steps_taken < max_steps:
-                    if _read_limit():
-                        found = True
-                        break
-                    self._send_cmd(f"STEP {batch_size} {homing_dir} {homing_speed} 0 {homing_speed}", timeout=15)
-                    steps_taken += batch_size
-                    time.sleep(0.02)
-
-                if not found:
+                # AHOME komutunu gönder
+                cmd = f"AHOME {homing_dir} {homing_back_dir} {homing_speed} {slow_speed} {backoff_steps} {clearance_steps} {limit_pin}"
+                log.info(f"Otonom Homing komutu gönderiliyor: {cmd}")
+                
+                # Arduino'nun homing'i tamamlaması için yeterince uzun bir timeout (örn: 30 sn)
+                resp, ok = self._send_cmd(cmd, timeout=30)
+                
+                if not ok:
                     self._motor_enable(False)
-                    return False, "Limit switch bulunamadı!"
-
-                time.sleep(0.5)
-
-                # AŞAMA 2: Geri çekilme (5°)
-                backoff = int(5.0 * steps_per_deg)
-                self._send_cmd(f"STEP {backoff} {homing_back_dir} {homing_speed} 0 {homing_speed}", timeout=15)
-                time.sleep(0.5)
-
-                # AŞAMA 3: Hassas yaklaşma (1. geçiş)
-                slow = homing_speed * 2
-                for _ in range(backoff + 100):
-                    if _read_limit():
-                        break
-                    self._send_cmd(f"STEP 1 {homing_dir} {slow} 0 {slow}", timeout=5)
-                    time.sleep(0.005)
-
-                time.sleep(0.5)
-
-                # AŞAMA 4: 2. geri çekilme (2°)
-                small_back = int(2.0 * steps_per_deg)
-                self._send_cmd(f"STEP {small_back} {homing_back_dir} {slow} 0 {slow}", timeout=15)
-                time.sleep(0.5)
-
-                # AŞAMA 5: Ultra hassas yaklaşma (2. geçiş)
-                ultra_slow = homing_speed * 4
-                for _ in range(small_back + 50):
-                    if _read_limit():
-                        break
-                    self._send_cmd(f"STEP 1 {homing_dir} {ultra_slow} 0 {ultra_slow}", timeout=5)
-                    time.sleep(0.005)
-
-                time.sleep(0.3)
-
-                # AŞAMA 6: Clearance (3° geri çekil)
-                clearance = int(3.0 * steps_per_deg)
-                self._send_cmd(f"STEP {clearance} {homing_back_dir} {homing_speed} 0 {homing_speed}", timeout=15)
-                time.sleep(0.2)
-
-                # AŞAMA 7: 0° olarak kaydet
-                self.current_angle = 0.0
-                self.is_homed = True
-                self._motor_enable(False)
-
-                log.info("Nozzle homing tamamlandı.")
-                return True, "Homing tamamlandı. Nozzle 0° pozisyonunda."
+                    self.is_homed = False
+                    return False, f"Homing hatası veya timeout: {resp}"
+                
+                if resp == "HOMED":
+                    self.current_angle = 0.0
+                    self.is_homed = True
+                    self._motor_enable(False)
+                    log.info("Nozzle homing tamamlandı (Otonom).")
+                    return True, "Homing tamamlandı. Nozzle 0° pozisyonunda."
+                else:
+                    self._motor_enable(False)
+                    self.is_homed = False
+                    return False, f"Homing başarisiz oldu: {resp}"
 
             except Exception as e:
                 self._motor_enable(False)
@@ -1493,6 +1456,13 @@ class NozzleController:
             time.sleep(2.0)
             retest = self.read_diode()
             summary['retest_result'] = retest
+            if retest.get('success'):
+                is_passing = retest.get('current_passing', False)
+                summary['is_passing'] = is_passing
+                summary['current_passing'] = is_passing
+                summary['decision'] = 'AKIM GEÇİYOR ✅' if is_passing else 'AKIM GEÇMİYOR ❌'
+        else:
+            summary['current_passing'] = is_passing
 
         if socketio_ref:
             socketio_ref.emit('nozzle_test_result', summary)

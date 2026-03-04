@@ -363,23 +363,23 @@
         "type": "goto_base"
       },
       {
-        "type": "delay",
-        "seconds": 15
+        "seconds": 7,
+        "type": "delay"
       },
       {
         "type": "auto_center",
         "word": "CRB"
       },
       {
-        "seconds": 7,
+        "seconds": 10,
         "type": "delay"
       },
       {
         "type": "move_z",
-        "z": -166
+        "z": -165.5
       },
       {
-        "seconds": 20,
+        "seconds": 16,
         "type": "delay"
       },
       {
@@ -394,7 +394,7 @@
         "z": -150
       },
       {
-        "seconds": 10,
+        "seconds": 7,
         "type": "delay"
       },
       {
@@ -402,15 +402,15 @@
         "type": "goto_base"
       },
       {
-        "seconds": 12,
+        "seconds": 5,
         "type": "delay"
       },
       {
         "type": "move_z",
-        "z": -171
+        "z": -165
       },
       {
-        "seconds": 15,
+        "seconds": 5,
         "type": "delay"
       },
       {
@@ -419,23 +419,15 @@
       {
         "fail_steps": [
           {
-            "seconds": 10,
+            "seconds": 5,
             "type": "delay"
           },
           {
             "type": "move_z",
-            "z": 0
+            "z": -150
           },
           {
-            "seconds": 15,
-            "type": "delay"
-          },
-          {
-            "base_name": "PCB BASE",
-            "type": "goto_base"
-          },
-          {
-            "seconds": 15,
+            "seconds": 7,
             "type": "delay"
           },
           {
@@ -443,7 +435,15 @@
             "type": "goto_base"
           },
           {
-            "seconds": 20,
+            "seconds": 9,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": -168
+          },
+          {
+            "seconds": 3,
             "type": "delay"
           },
           {
@@ -458,71 +458,11 @@
             "z": 0
           },
           {
-            "seconds": 20,
+            "seconds": 17.5,
             "type": "delay"
           },
           {
-            "base_name": "PCB BASE",
-            "type": "goto_base"
-          },
-          {
-            "seconds": 10,
-            "type": "delay"
-          },
-          {
-            "type": "verify"
-          },
-          {
-            "seconds": 10,
-            "type": "delay"
-          }
-        ],
-        "pass_steps": [
-          {
-            "seconds": 10,
-            "type": "delay"
-          },
-          {
-            "type": "move_z",
-            "z": 0
-          },
-          {
-            "seconds": 20,
-            "type": "delay"
-          },
-          {
-            "base_name": "PCB BASE",
-            "type": "goto_base"
-          },
-          {
-            "seconds": 15,
-            "type": "delay"
-          },
-          {
-            "base_name": "R1 PCB",
-            "type": "goto_base"
-          },
-          {
-            "seconds": 15,
-            "type": "delay"
-          },
-          {
-            "type": "pump_off"
-          },
-          {
-            "seconds": 5,
-            "type": "delay"
-          },
-          {
-            "type": "move_z",
-            "z": 0
-          },
-          {
-            "seconds": 15,
-            "type": "delay"
-          },
-          {
-            "base_name": "PCB BASE",
+            "base_name": "PCB FOTO",
             "type": "goto_base"
           },
           {
@@ -533,7 +473,67 @@
             "type": "verify"
           },
           {
-            "seconds": 10,
+            "seconds": 7,
+            "type": "delay"
+          }
+        ],
+        "pass_steps": [
+          {
+            "seconds": 5,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": -150
+          },
+          {
+            "seconds": 7,
+            "type": "delay"
+          },
+          {
+            "base_name": "R1 PCB",
+            "type": "goto_base"
+          },
+          {
+            "seconds": 9,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": -167
+          },
+          {
+            "seconds": 3,
+            "type": "delay"
+          },
+          {
+            "type": "pump_off"
+          },
+          {
+            "seconds": 5,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": 0
+          },
+          {
+            "seconds": 17.5,
+            "type": "delay"
+          },
+          {
+            "base_name": "PCB FOTO",
+            "type": "goto_base"
+          },
+          {
+            "seconds": 8,
+            "type": "delay"
+          },
+          {
+            "type": "verify"
+          },
+          {
+            "seconds": 7,
             "type": "delay"
           }
         ],
@@ -551,15 +551,15 @@
         "type": "goto_base"
       },
       {
-        "type": "delay",
-        "seconds": 15
+        "seconds": 7,
+        "type": "delay"
       },
       {
         "type": "auto_center",
         "word": "SHN"
       },
       {
-        "seconds": 7,
+        "seconds": 10,
         "type": "delay"
       },
       {
@@ -567,7 +567,7 @@
         "z": -166
       },
       {
-        "seconds": 20,
+        "seconds": 16,
         "type": "delay"
       },
       {
@@ -582,7 +582,7 @@
         "z": -150
       },
       {
-        "seconds": 10,
+        "seconds": 7,
         "type": "delay"
       },
       {
@@ -590,15 +590,15 @@
         "type": "goto_base"
       },
       {
-        "seconds": 12,
+        "seconds": 5,
         "type": "delay"
       },
       {
         "type": "move_z",
-        "z": -171
+        "z": -165
       },
       {
-        "seconds": 15,
+        "seconds": 5,
         "type": "delay"
       },
       {
@@ -607,23 +607,15 @@
       {
         "fail_steps": [
           {
-            "seconds": 10,
+            "seconds": 5,
             "type": "delay"
           },
           {
             "type": "move_z",
-            "z": 0
+            "z": -150
           },
           {
-            "seconds": 15,
-            "type": "delay"
-          },
-          {
-            "base_name": "PCB BASE",
-            "type": "goto_base"
-          },
-          {
-            "seconds": 15,
+            "seconds": 7,
             "type": "delay"
           },
           {
@@ -631,7 +623,15 @@
             "type": "goto_base"
           },
           {
-            "seconds": 20,
+            "seconds": 9,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": -168
+          },
+          {
+            "seconds": 3,
             "type": "delay"
           },
           {
@@ -646,71 +646,11 @@
             "z": 0
           },
           {
-            "seconds": 20,
+            "seconds": 17.5,
             "type": "delay"
           },
           {
-            "base_name": "PCB BASE",
-            "type": "goto_base"
-          },
-          {
-            "seconds": 10,
-            "type": "delay"
-          },
-          {
-            "type": "verify"
-          },
-          {
-            "seconds": 10,
-            "type": "delay"
-          }
-        ],
-        "pass_steps": [
-          {
-            "seconds": 10,
-            "type": "delay"
-          },
-          {
-            "type": "move_z",
-            "z": 0
-          },
-          {
-            "seconds": 20,
-            "type": "delay"
-          },
-          {
-            "base_name": "PCB BASE",
-            "type": "goto_base"
-          },
-          {
-            "seconds": 15,
-            "type": "delay"
-          },
-          {
-            "base_name": "R2 PCB",
-            "type": "goto_base"
-          },
-          {
-            "seconds": 15,
-            "type": "delay"
-          },
-          {
-            "type": "pump_off"
-          },
-          {
-            "seconds": 5,
-            "type": "delay"
-          },
-          {
-            "type": "move_z",
-            "z": 0
-          },
-          {
-            "seconds": 15,
-            "type": "delay"
-          },
-          {
-            "base_name": "PCB BASE",
+            "base_name": "PCB FOTO",
             "type": "goto_base"
           },
           {
@@ -721,7 +661,67 @@
             "type": "verify"
           },
           {
-            "seconds": 10,
+            "seconds": 7,
+            "type": "delay"
+          }
+        ],
+        "pass_steps": [
+          {
+            "seconds": 5,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": -150
+          },
+          {
+            "seconds": 7,
+            "type": "delay"
+          },
+          {
+            "base_name": "R2 PCB",
+            "type": "goto_base"
+          },
+          {
+            "seconds": 9,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": -168
+          },
+          {
+            "seconds": 3,
+            "type": "delay"
+          },
+          {
+            "type": "pump_off"
+          },
+          {
+            "seconds": 5,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": 0
+          },
+          {
+            "seconds": 17.5,
+            "type": "delay"
+          },
+          {
+            "base_name": "PCB FOTO",
+            "type": "goto_base"
+          },
+          {
+            "seconds": 8,
+            "type": "delay"
+          },
+          {
+            "type": "verify"
+          },
+          {
+            "seconds": 7,
             "type": "delay"
           }
         ],
@@ -739,7 +739,7 @@
         "type": "goto_base"
       },
       {
-        "seconds": 15,
+        "seconds": 7,
         "type": "delay"
       },
       {
@@ -747,15 +747,15 @@
         "word": "AYD"
       },
       {
-        "seconds": 7,
-        "type": "delay"
+        "type": "delay",
+        "seconds": 10
       },
       {
         "type": "move_z",
         "z": -166
       },
       {
-        "seconds": 20,
+        "seconds": 16,
         "type": "delay"
       },
       {
@@ -770,7 +770,7 @@
         "z": -150
       },
       {
-        "seconds": 10,
+        "seconds": 5,
         "type": "delay"
       },
       {
@@ -778,15 +778,15 @@
         "type": "goto_base"
       },
       {
-        "seconds": 12,
+        "seconds": 7.5,
         "type": "delay"
       },
       {
         "type": "move_z",
-        "z": -167
+        "z": -162.5
       },
       {
-        "seconds": 15,
+        "seconds": 5,
         "type": "delay"
       },
       {
@@ -796,7 +796,7 @@
         "expected_passing": true,
         "fail_steps": [
           {
-            "seconds": 10,
+            "seconds": 5,
             "type": "delay"
           },
           {
@@ -804,21 +804,17 @@
             "z": -150
           },
           {
-            "seconds": 10,
+            "seconds": 3,
             "type": "delay"
           },
           {
             "angle": 180,
             "type": "nozzle_goto"
-          },
-          {
-            "seconds": 5,
-            "type": "delay"
           }
         ],
         "pass_steps": [
           {
-            "seconds": 10,
+            "seconds": 5,
             "type": "delay"
           },
           {
@@ -829,27 +825,11 @@
         "type": "if_diode"
       },
       {
-        "type": "move_z",
-        "z": 0
-      },
-      {
-        "seconds": 15,
-        "type": "delay"
-      },
-      {
-        "base_name": "PCB BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
         "base_name": "D2 PCB",
         "type": "goto_base"
       },
       {
-        "seconds": 20,
+        "seconds": 10,
         "type": "delay"
       },
       {
@@ -864,22 +844,22 @@
         "z": 0
       },
       {
-        "seconds": 15,
+        "seconds": 17.5,
         "type": "delay"
       },
       {
-        "base_name": "PCB BASE",
+        "base_name": "PCB FOTO",
         "type": "goto_base"
       },
       {
-        "seconds": 10,
+        "seconds": 5,
         "type": "delay"
       },
       {
         "type": "verify"
       },
       {
-        "seconds": 10,
+        "seconds": 3,
         "type": "delay"
       },
       {
@@ -887,15 +867,8 @@
         "type": "nozzle_goto"
       },
       {
-        "seconds": 5,
+        "seconds": 3,
         "type": "delay"
-      },
-      {
-        "type": "nozzle_home"
-      },
-      {
-        "type": "delay",
-        "seconds": 5
       }
     ]
   },
@@ -907,7 +880,7 @@
         "type": "goto_base"
       },
       {
-        "seconds": 15,
+        "seconds": 7,
         "type": "delay"
       },
       {
@@ -915,15 +888,15 @@
         "word": "MUS"
       },
       {
-        "seconds": 7,
+        "seconds": 10,
         "type": "delay"
       },
       {
         "type": "move_z",
-        "z": -164
+        "z": -166
       },
       {
-        "seconds": 20,
+        "seconds": 16,
         "type": "delay"
       },
       {
@@ -938,7 +911,7 @@
         "z": -150
       },
       {
-        "seconds": 10,
+        "seconds": 5,
         "type": "delay"
       },
       {
@@ -946,15 +919,15 @@
         "type": "goto_base"
       },
       {
-        "seconds": 12,
+        "seconds": 7.5,
         "type": "delay"
       },
       {
         "type": "move_z",
-        "z": -167
+        "z": -162.5
       },
       {
-        "seconds": 15,
+        "seconds": 5,
         "type": "delay"
       },
       {
@@ -964,7 +937,7 @@
         "expected_passing": true,
         "fail_steps": [
           {
-            "seconds": 10,
+            "seconds": 5,
             "type": "delay"
           },
           {
@@ -972,21 +945,17 @@
             "z": -150
           },
           {
-            "seconds": 10,
+            "seconds": 3,
             "type": "delay"
           },
           {
             "angle": 180,
             "type": "nozzle_goto"
-          },
-          {
-            "seconds": 5,
-            "type": "delay"
           }
         ],
         "pass_steps": [
           {
-            "seconds": 10,
+            "seconds": 5,
             "type": "delay"
           },
           {
@@ -997,27 +966,11 @@
         "type": "if_diode"
       },
       {
-        "type": "move_z",
-        "z": 0
-      },
-      {
-        "seconds": 15,
-        "type": "delay"
-      },
-      {
-        "base_name": "PCB BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
         "base_name": "D1 PCB",
         "type": "goto_base"
       },
       {
-        "seconds": 20,
+        "seconds": 10,
         "type": "delay"
       },
       {
@@ -1032,22 +985,43 @@
         "z": 0
       },
       {
-        "seconds": 15,
+        "seconds": 17.5,
         "type": "delay"
       },
       {
-        "base_name": "PCB BASE",
+        "base_name": "PCB FOTO",
         "type": "goto_base"
       },
       {
-        "seconds": 10,
+        "seconds": 5,
         "type": "delay"
       },
       {
         "type": "verify"
       },
       {
-        "seconds": 10,
+        "seconds": 3,
+        "type": "delay"
+      },
+      {
+        "angle": 0,
+        "type": "nozzle_goto"
+      },
+      {
+        "seconds": 3,
+        "type": "delay"
+      }
+    ]
+  },
+  {
+    "name": "DÖN BABA DÖNELİM",
+    "steps": [
+      {
+        "angle": 180,
+        "type": "nozzle_goto"
+      },
+      {
+        "seconds": 5,
         "type": "delay"
       },
       {
@@ -1059,11 +1033,35 @@
         "type": "delay"
       },
       {
+        "type": "pump_on"
+      },
+      {
+        "seconds": 2,
+        "type": "delay"
+      },
+      {
+        "angle": 90,
+        "type": "nozzle_goto"
+      },
+      {
+        "type": "pump_off"
+      },
+      {
+        "seconds": 5,
+        "type": "delay"
+      },
+      {
+        "type": "pump_on"
+      },
+      {
         "type": "nozzle_home"
       },
       {
         "seconds": 5,
         "type": "delay"
+      },
+      {
+        "type": "pump_off"
       }
     ]
   }

@@ -255,9 +255,20 @@
                 </div>
                 <style>
                     @keyframes bannerPop {
-                        0% { transform: translate(-50%,-50%) scale(0.5); opacity:0; }
-                        60% { transform: translate(-50%,-50%) scale(1.05); opacity:1; }
-                        100% { transform: translate(-50%,-50%) scale(1); opacity:1; }
+                        0% {
+                            transform: translate(-50%, -50%) scale(0.5);
+                            opacity: 0;
+                        }
+
+                        60% {
+                            transform: translate(-50%, -50%) scale(1.05);
+                            opacity: 1;
+                        }
+
+                        100% {
+                            transform: translate(-50%, -50%) scale(1);
+                            opacity: 1;
+                        }
                     }
                 </style>
 
@@ -1467,6 +1478,18 @@
                             </div>
                             <p style="font-size:0.55rem; color:#555; margin-top:2px">Düşük=fazla siyah, Yüksek=az siyah
                             </p>
+                        </div>
+                        <div style="background:#111; border-radius:6px; padding:8px; border:1px solid #333">
+                            <div style="font-size:0.7rem; color:#888; font-weight:700; margin-bottom:4px">GÖSTERİM EŞİĞİ
+                                (%)</div>
+                            <div style="display:flex; align-items:center; gap:8px">
+                                <input type="range" id="vDisplayThreshold" min="0" max="100" value="5" style="flex:1"
+                                    oninput="document.getElementById('vDtVal').textContent=this.value">
+                                <span id="vDtVal" class="mono"
+                                    style="font-size:1.1rem; font-weight:bold; color:var(--blue); min-width:28px">5</span>
+                            </div>
+                            <p style="font-size:0.55rem; color:#555; margin-top:2px">Bu değerin altındaki yüzdeler "BOŞ"
+                                olarak gösterilir</p>
                         </div>
                         <div style="display:flex; gap:6px">
                             <button class="btn btn-p ripple" onclick="saveVerificationSettings()"

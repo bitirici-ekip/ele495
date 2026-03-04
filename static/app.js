@@ -272,11 +272,13 @@ function appendBoxProgressToHUD(boxData) {
     const icon = boxData.success ? '✅' : '❌';
     const card = document.createElement('div');
     card.style.cssText = `background:#222; border:1px solid ${color}; border-left:4px solid ${color}; padding:6px 10px; border-radius:6px; white-space:nowrap; display:flex; align-items:center; gap:8px; min-width:140px; animation:fadeIn 0.4s ease`;
+    const dt = _vConfig.display_threshold || 0;
+    const ratioText = (boxData.ratio < dt) ? 'BOŞ' : `${boxData.ratio}%`;
     card.innerHTML = `
         <img src="data:image/jpeg;base64,${boxData.roi_image}" style="width:50px; height:38px; border-radius:3px; border:1px solid #555; object-fit:cover">
         <div style="display:flex; flex-direction:column">
             <span style="font-size:0.7rem; color:#aaa; font-weight:bold">${esc(boxData.name)}</span>
-            <span style="font-size:0.95rem; font-weight:bold; color:${color}">${boxData.ratio}% ${icon}</span>
+            <span style="font-size:0.95rem; font-weight:bold; color:${color}">${ratioText} ${icon}</span>
             <span style="font-size:0.6rem; color:#666">hedef: ${boxData.target}%</span>
         </div>`;
     hud.appendChild(card);
@@ -287,16 +289,18 @@ function renderVerificationHUD(results) {
     if (!hud) return;
     if (!results || !results.length) { hud.innerHTML = ''; return; }
 
+    const dt = _vConfig.display_threshold || 0;
     let h = '';
     results.forEach(r => {
         const color = r.success ? 'var(--green)' : 'var(--red)';
         const icon = r.success ? '✅' : '❌';
+        const ratioText = (r.ratio < dt) ? 'BOŞ' : `${r.ratio}%`;
         const roiImg = r.roi_image ? `<img src="data:image/jpeg;base64,${r.roi_image}" style="width:50px; height:38px; border-radius:3px; border:1px solid #555; object-fit:cover">` : '';
         h += `<div style="background:#222; border:1px solid ${color}; border-left:4px solid ${color}; padding:6px 10px; border-radius:6px; white-space:nowrap; display:flex; align-items:center; gap:8px; min-width:140px">
             ${roiImg}
             <div style="display:flex; flex-direction:column">
                 <span style="font-size:0.7rem; color:#aaa; font-weight:bold">${esc(r.name)}</span>
-                <span style="font-size:0.95rem; font-weight:bold; color:${color}">${r.ratio}% ${icon}</span>
+                <span style="font-size:0.95rem; font-weight:bold; color:${color}">${ratioText} ${icon}</span>
                 <span style="font-size:0.6rem; color:#666">hedef: ${r.target}%</span>
             </div>
         </div>`;
@@ -317,15 +321,17 @@ function renderVerificationResults(results) {
     showVerificationBanner(allPass);
 
     // Sadece kutu detaylarını panelde göster (banner yok)
+    const dt = _vConfig.display_threshold || 0;
     let h = '<div style="display:flex; flex-direction:column; gap:6px">';
     results.forEach(r => {
         const color = r.success ? 'var(--green)' : 'var(--red)';
+        const ratioText = (r.ratio < dt) ? 'BOŞ' : `${r.ratio}%`;
         h += `<div style="display:flex; justify-content:space-between; align-items:center; background:#111; border-left:4px solid ${color}; border-radius:4px; padding:6px 8px">
             <div style="font-size:0.8rem; color:#aaa; display:flex; flex-direction:column">
                 <span>${esc(r.name)}</span>
                 <span style="font-size:0.6rem; color:#666">Hedef: ${r.target}%</span>
             </div>
-            <div style="font-weight:bold; color:${color}; font-size:1rem">${r.ratio}%</div>
+            <div style="font-weight:bold; color:${color}; font-size:1rem">${ratioText}</div>
         </div>`;
     });
     h += '</div>';
@@ -1915,7 +1921,7 @@ async function runMasterScenarioByName(name) {
 }
 
 // — Verification (Doğrulama) —
-let _vConfig = { base_name: '', threshold: 127, boxes: [] };
+let _vConfig = { base_name: '', threshold: 127, display_threshold: 5, boxes: [] };
 
 async function loadVerification() {
     try {
@@ -1929,6 +1935,13 @@ async function loadVerification() {
                 eTh.value = _vConfig.threshold || 127;
                 const lbl = $('vThVal');
                 if (lbl) lbl.textContent = eTh.value;
+            }
+
+            const eDt = $('vDisplayThreshold');
+            if (eDt) {
+                eDt.value = _vConfig.display_threshold || 5;
+                const dtLbl = $('vDtVal');
+                if (dtLbl) dtLbl.textContent = eDt.value;
             }
 
             renderVerificationBoxes();
@@ -1992,6 +2005,7 @@ function addNewVerificationBox() {
 async function saveVerificationSettings() {
     _vConfig.base_name = $('vBaseSelect').value;
     _vConfig.threshold = parseInt($('vThreshold').value) || 127;
+    _vConfig.display_threshold = parseInt($('vDisplayThreshold').value) || 5;
 
     const r = await api('/api/verification/settings', _vConfig, 'POST');
     if (r.success) {

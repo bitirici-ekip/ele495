@@ -93,6 +93,18 @@ void processCommand(String cmd) {
     return;
   }
 
+  // AHOME: Otonom Homing
+  if (command == "AHOME") {
+    handleAHome(args);
+    return;
+  }
+
+  // AROTATE: Otonom Dönüş
+  if (command == "AROTATE") {
+    handleARotate(args);
+    return;
+  }
+
   // STEP: Normal adım
   if (command == "STEP") {
     handleStep(args, -1); // -1 = koruma yok
@@ -276,4 +288,149 @@ void handleMultiARead(String args) {
   }
   Serial.print("OK:");
   Serial.println(total / count);
+}
+
+// ===================== AHOME OTONOM HOMING =====================
+void handleAHome(String args) {
+  // Args: "<dir> <back_dir> <speed_us> <slow_speed_us> <backoff_steps> <clearance_steps> <limit_pin>"
+  long p[7];
+  String rem = args;
+  for(int i=0; i<6; i++) {
+    int idx = rem.indexOf(' ');
+    if (idx == -1) { Serial.println("ERR:AHOME arguman eksik"); return; }
+    p[i] = rem.substring(0, idx).toInt();
+    rem = rem.substring(idx + 1);
+  }
+  p[6] = rem.toInt();
+
+  int dir             = p[0];
+  int back_dir        = p[1];
+  int speed_us        = p[2];
+  int slow_speed_us   = p[3];
+  long backoff_steps  = p[4];
+  long clearance_steps= p[5];
+  int limit_pin       = p[6];
+
+  // Acil Kaçış (zaten switch başındaysa)
+  if (digitalRead(limit_pin) == LOW) {
+      digitalWrite(DIR_PIN, back_dir ? HIGH : LOW);
+      for(long i=0; i<backoff_steps * 2; i++) {
+         digitalWrite(STEP_PIN, HIGH);
+         delayMicroseconds(speed_us);
+         digitalWrite(STEP_PIN, LOW);
+         delayMicroseconds(speed_us);
+      }
+      delay(500);
+      if (digitalRead(limit_pin) == LOW) {
+         Serial.println("ERR:HOMING_STUCK");
+         return;
+      }
+  }
+
+  // AŞAMA 1: Hızlı yaklaşma
+  digitalWrite(DIR_PIN, dir ? HIGH : LOW);
+  bool found = false;
+  for(long i=0; i<30000; i++) {
+    if(digitalRead(limit_pin) == LOW) { found = true; break; }
+    digitalWrite(STEP_PIN, HIGH); delayMicroseconds(speed_us);
+    digitalWrite(STEP_PIN, LOW); delayMicroseconds(speed_us);
+  }
+  if(!found) { Serial.println("ERR:NO_LIMIT_SWITCH"); return; }
+
+  delay(500);
+
+  // AŞAMA 2: Geri çekilme
+  digitalWrite(DIR_PIN, back_dir ? HIGH : LOW);
+  for(long i=0; i<backoff_steps; i++) {
+    digitalWrite(STEP_PIN, HIGH); delayMicroseconds(speed_us);
+    digitalWrite(STEP_PIN, LOW); delayMicroseconds(speed_us);
+  }
+
+  delay(500);
+
+  // AŞAMA 3: Hassas (Yavaş) yaklaşma
+  digitalWrite(DIR_PIN, dir ? HIGH : LOW);
+  found = false;
+  for(long i=0; i<backoff_steps + 800; i++) {
+    if(digitalRead(limit_pin) == LOW) { found = true; break; }
+    digitalWrite(STEP_PIN, HIGH); delayMicroseconds(slow_speed_us);
+    digitalWrite(STEP_PIN, LOW); delayMicroseconds(slow_speed_us);
+  }
+  if(!found) { Serial.println("ERR:HOMING_FAILED_STAGE2"); return; }
+
+  delay(300);
+
+  // AŞAMA 4: Clearance geri çekilme
+  digitalWrite(DIR_PIN, back_dir ? HIGH : LOW);
+  for(long i=0; i<clearance_steps; i++) {
+    digitalWrite(STEP_PIN, HIGH); delayMicroseconds(speed_us);
+    digitalWrite(STEP_PIN, LOW); delayMicroseconds(speed_us);
+  }
+
+  Serial.println("OK:HOMED");
+}
+
+// ===================== AROTATE OTONOM DONUS =====================
+void handleARotate(String args) {
+  // Args: "<count> <dir> <speed> <accel_steps> <accel_start> <limit_pin>"
+  long p[6];
+  String rem = args;
+  for(int i=0; i<5; i++) {
+    int idx = rem.indexOf(' ');
+    if (idx == -1) { Serial.println("ERR:AROTATE arguman eksik"); return; }
+    p[i] = rem.substring(0, idx).toInt();
+    rem = rem.substring(idx + 1);
+  }
+  p[5] = rem.toInt();
+
+  long count         = p[0];
+  int dir            = p[1];
+  int speed_us       = p[2];
+  int accel_steps    = p[3];
+  int accel_start_us = p[4];
+  int limit_pin      = p[5];
+
+  if (count <= 0 || count > 100000) {
+    Serial.println("ERR:Adim sayisi 1-100000 arasi olmali");
+    return;
+  }
+  if (speed_us < 100) {
+    Serial.println("ERR:Hiz cok yuksek (min 100us)");
+    return;
+  }
+
+  digitalWrite(DIR_PIN, dir ? HIGH : LOW);
+
+  long accelZone = min((long)accel_steps, count / 2);
+  bool emergency_stopped = false;
+
+  for (long i = 0; i < count; i++) {
+    // Acil durdurma: limit_pin tanımlıysa her adımda kontrol et
+    if (limit_pin >= 0) {
+      if (digitalRead(limit_pin) == LOW) {
+        emergency_stopped = true;
+        break;
+      }
+    }
+
+    int currentSpeed;
+    if (accelZone > 0 && i < accelZone) {
+      currentSpeed = map(i, 0, accelZone, accel_start_us, speed_us);
+    } else if (accelZone > 0 && i > count - accelZone) {
+      currentSpeed = map(i, count - accelZone, count, speed_us, accel_start_us);
+    } else {
+      currentSpeed = speed_us;
+    }
+
+    digitalWrite(STEP_PIN, HIGH);
+    delayMicroseconds(currentSpeed);
+    digitalWrite(STEP_PIN, LOW);
+    delayMicroseconds(currentSpeed);
+  }
+
+  if (emergency_stopped) {
+    Serial.println("OK:ESTOP");
+  } else {
+    Serial.println("OK:DONE");
+  }
 }

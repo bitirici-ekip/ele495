@@ -2,14 +2,32 @@
   {
     "name": "ANA İŞLEV",
     "sequence": [
-      "CRB to R1",
-      "SHN to R2",
-      "AYD to D2",
-      "MUS to D1"
+      "MUS YOLU",
+      "AYD YOLU",
+      "CRB YOLU",
+      "SHN YOLU"
     ]
   },
   {
     "name": "FULL SETUP",
+    "sequence": [
+      "CRB YOLU",
+      "SHN YOLU",
+      "AYD YOLU",
+      "MUS YOLU"
+    ]
+  },
+  {
+    "name": "Önce Diyot",
+    "sequence": [
+      "MUS YOLU",
+      "AYD YOLU",
+      "SHN YOLU",
+      "CRB YOLU"
+    ]
+  },
+  {
+    "name": "Önce Direnç",
     "sequence": [
       "CRB YOLU",
       "SHN YOLU",
