@@ -93,8 +93,8 @@ class Config:
 
     # OCR parametreleri
     OCR_CONFIDENCE_THRESHOLD = 40
-    STABILITY_DURATION = 0.1
-    IOU_MATCH_THRESHOLD = 0.4
+    STABILITY_DURATION = 1.0    # Kutu kaybolma süresi (saniye) — düşük = titrek
+    IOU_MATCH_THRESHOLD = 0.3
     OCR_PSM_MODE = 6          # 6=SINGLE_BLOCK, 11=SPARSE_TEXT, 3=AUTO
     OCR_WHITELIST = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -131,7 +131,7 @@ class Config:
     OCR_MIN_WORD_LENGTH = 3
 
     # Kutu Büyüme Limiti (Ani sapıtma koruması — bu kattan fazla büyüyen kutular reddedilir)
-    BOX_GROWTH_LIMIT = 1.5
+    BOX_GROWTH_LIMIT = 2.0
 
     # Açılışta Otomatik Home
     AUTO_HOME = True
@@ -644,6 +644,7 @@ class PNPDriver:
         self.grbl_state = "Unknown"    # Idle, Run, Hold, Alarm, etc.
         self.alarm_active = False
         self._lock = threading.Lock()
+        self._busy = False  # Motor operasyonu devam ederken True
 
     def find_port(self):
         """Otomatik olarak GRBL cihazının bağlı olduğu portu bulur.
@@ -718,56 +719,69 @@ class PNPDriver:
             log.error(f"PNP bağlantı hatası: {e}")
             return False
 
+    def _send_raw(self, cmd, timeout=5):
+        """
+        GRBL'e komut gönder ve 'ok' yanıtını bekle.
+        KİLİT ALMAZ — çağıran taraf kilidi tutmalıdır.
+        Bu sayede çoklu komut dizileri (move_relative vb.) atomik yürütülür.
+        """
+        if not self.ser:
+            log.debug(f"[SIM] {cmd}")
+            return True
+
+        try:
+            full_cmd = cmd.strip() + '\r\n'
+            self.ser.write(full_cmd.encode())
+
+            start = time.time()
+            while True:
+                if self.ser.in_waiting:
+                    line = self.ser.readline().decode('utf-8', errors='ignore').strip()
+                    # GRBL status report satırlarını atla (<Idle|...> vs.)
+                    if line.startswith('<') and line.endswith('>'):
+                        continue
+                    if not line:
+                        continue
+                    if line == 'ok':
+                        return True
+                    if 'error' in line.lower():
+                        error_msg = f"GRBL Hatası: {cmd} → {line}"
+                        log.error(error_msg)
+                        add_error(error_msg)
+                        return False
+                    if 'alarm' in line.lower():
+                        self.alarm_active = True
+                        self.grbl_state = 'Alarm'
+                        error_msg = f"ALARM: {line}"
+                        log.warning(error_msg)
+                        add_error(error_msg)
+
+                if time.time() - start > timeout:
+                    error_msg = f"Timeout ({timeout}s): {cmd}"
+                    log.error(error_msg)
+                    add_error(error_msg)
+                    return False
+                time.sleep(0.01)
+
+        except Exception as e:
+            error_msg = f"Gönderme hatası ({cmd}): {e}"
+            log.error(error_msg)
+            add_error(error_msg)
+            return False
+
     def send(self, cmd, timeout=5):
         """
         GRBL'e komut gönder ve 'ok' yanıtını bekle.
         Thread-safe: _lock ile korunur.
-        Timeout 5 saniye — UI kilitlenmesini önler.
+        Tek komutluk işlemler için kullanılır.
         """
         with self._lock:
-            if not self.ser:
-                log.debug(f"[SIM] {cmd}")
-                return True
-
-            try:
-                full_cmd = cmd.strip() + '\r\n'
-                self.ser.write(full_cmd.encode())
-
-                start = time.time()
-                while True:
-                    if self.ser.in_waiting:
-                        line = self.ser.readline().decode('utf-8', errors='ignore').strip()
-                        if line == 'ok':
-                            return True
-                        if 'error' in line.lower():
-                            error_msg = f"GRBL Hatası: {cmd} → {line}"
-                            log.error(error_msg)
-                            add_error(error_msg)
-                            return False
-                        if 'alarm' in line.lower():
-                            self.alarm_active = True
-                            self.grbl_state = 'Alarm'
-                            error_msg = f"ALARM: {line}"
-                            log.warning(error_msg)
-                            add_error(error_msg)
-
-                    if time.time() - start > timeout:
-                        error_msg = f"Timeout ({timeout}s): {cmd}"
-                        log.error(error_msg)
-                        add_error(error_msg)
-                        return False
-                    time.sleep(0.01)
-
-            except Exception as e:
-                error_msg = f"Gönderme hatası ({cmd}): {e}"
-                log.error(error_msg)
-                add_error(error_msg)
-                return False
+            return self._send_raw(cmd, timeout)
 
     def move_relative(self, dx=0, dy=0, dz=0, feed=None):
         """
         Göreceli hareket (G91 ile).
-        PNP kamerasının fiziksel montajına göre yön invertlenebilir.
+        ATOMİK: Tüm komutlar tek kilit altında gönderilir.
         """
         if config.INVERT_X:
             dx = -dx
@@ -776,8 +790,6 @@ class PNPDriver:
 
         feed = feed or config.FEED_RATE
 
-        # Göreceli modda hareket et, sonra mutlak moda dön
-        self.send("G91")  # Relative
         cmd = f"G1 F{feed}"
         if dx != 0:
             cmd += f" X{dx:.3f}"
@@ -787,10 +799,16 @@ class PNPDriver:
             cmd += f" Z{dz:.3f}"
 
         log.info(f"Motor hareketi: dx={dx:.3f}mm, dy={dy:.3f}mm, dz={dz:.3f}mm")
-        self.send(cmd)
-        self.send("G4 P0")   # Senkronizasyon — hareketin tamamlanmasını bekle
-        # Hareket tamamlandıktan sonra tekrar mutlak moda dön
-        self.send("G90")
+
+        with self._lock:
+            self._busy = True
+            try:
+                self._send_raw("G91")
+                self._send_raw(cmd)
+                self._send_raw("G4 P0")
+                self._send_raw("G90")
+            finally:
+                self._busy = False
         
         # Konum güncelleme (tahmini)
         self.current_x += dx
@@ -813,7 +831,7 @@ class PNPDriver:
         return success
 
     def move_absolute(self, x=None, y=None, z=None, feed=None):
-        """Mutlak koordinata hareket."""
+        """Mutlak koordinata hareket. ATOMİK."""
         feed = feed or config.FEED_RATE
         cmd = f"G1 F{feed}"
         if x is not None:
@@ -827,26 +845,35 @@ class PNPDriver:
             self.current_z = z
 
         log.info(f"Mutlak hareket: {cmd}")
-        self.send(cmd)
-        self.send("G4 P0")
+        with self._lock:
+            self._busy = True
+            try:
+                self._send_raw(cmd)
+                self._send_raw("G4 P0")
+            finally:
+                self._busy = False
         return True
 
     def home(self):
-        """Home komutu ($H) — tüm eksenleri referans noktasına taşır."""
+        """Home komutu ($H) — tüm eksenleri referans noktasına taşır. ATOMİK."""
         log.info("Home başlatılıyor ($H)...")
-        if self.send("$H", timeout=60):
-            log.info("Home tamamlandı.")
-            # Home tamamlandıktan sonra çalışma koordinatlarını 0,0,0'a çek
-            self.send("G10 P0 L20 X0 Y0 Z0")
-            self.send("G92 X0 Y0 Z0")
-            self.current_x = 0.0
-            self.current_y = 0.0
-            self.current_z = 0.0
-            time.sleep(1)
-            return True
-        else:
-            log.error("Home hatası!")
-            return False
+        with self._lock:
+            self._busy = True
+            try:
+                if self._send_raw("$H", timeout=60):
+                    log.info("Home tamamlandı.")
+                    self._send_raw("G10 P0 L20 X0 Y0 Z0")
+                    self._send_raw("G92 X0 Y0 Z0")
+                    self.current_x = 0.0
+                    self.current_y = 0.0
+                    self.current_z = 0.0
+                    time.sleep(1)
+                    return True
+                else:
+                    log.error("Home hatası!")
+                    return False
+            finally:
+                self._busy = False
 
     def pump(self, state):
         """Vakum pompasını aç (True) veya kapat (False)."""
@@ -877,22 +904,27 @@ class PNPDriver:
     def query_grbl_status(self):
         """
         GRBL'e '?' komutu göndererek gerçek zamanlı durum sorgular.
-        Yanıt formatı: <Idle|MPos:0.000,0.000,0.000|...>
-        State ve pozisyonu parse eder.
+        Motor meşgulse (self._busy) sorgulamayı atlar.
         """
+        # Motor meşgulse sorgulamayı atla — seri portu bozmayalım
+        if self._busy:
+            return self.get_status()
+
         with self._lock:
             if not self.ser:
                 return self.get_status()
 
             try:
-                # Giriş buffer'ını temizle
-                self.ser.flushInput()
+                # Buffer'da birikmiş veri varsa temizle (non-blocking)
+                if self.ser.in_waiting:
+                    self.ser.read(self.ser.in_waiting)
+
                 # '?' komutu \n gerektirmez
                 self.ser.write(b'?')
 
                 start = time.time()
                 response = ""
-                while time.time() - start < 1.0:
+                while time.time() - start < 0.5:
                     if self.ser.in_waiting:
                         chunk = self.ser.read(self.ser.in_waiting).decode('utf-8', errors='ignore')
                         response += chunk
@@ -1500,6 +1532,8 @@ class CameraManager:
         self.current_thresh = None        # Threshold (OCR için)
         self.annotated_frame = None       # Kutu + çizgi çizilmiş frame (stream için)
         self.raw_display_frame = None     # Temiz frame (doğrulama tab için)
+        self.annotated_jpeg = None
+        self.raw_jpeg_bytes = None
         self.frame_lock = threading.Lock()
 
         # OCR sonuçları
@@ -1554,6 +1588,7 @@ class CameraManager:
         Simülasyon modunda siyah ekran döndürür.
         """
         if self.simulation:
+            time.sleep(0.05)
             # Simülasyon — test için siyah ekran + metin
             h = config.CAMERA_HEIGHT
             w = config.CAMERA_WIDTH
@@ -1606,15 +1641,25 @@ class CameraManager:
 
     def update_stable_boxes(self, new_detections):
         """
-        Algılama kararlılığı: IoU ile eşleştir, kısa süreli kayıpları tolere et.
+        Algılama kararlılığı: IoU ile eşleştir, EMA ile yumuşat.
         OCR sonuçlarının titremesini (flickering) önler.
+        
+        EMA (Exponential Moving Average): Kutu koordinatlarını kademeli
+        olarak günceller, ani sıçramaları engeller.
+        seen_count: Yeni kutular en az 2 kez görülmeden gösterilmez.
         """
         now = time.time()
+        EMA_ALPHA = 0.3  # 0=değişmez, 1=anında güncelle, 0.3=yumuşak
+        MIN_SEEN_COUNT = 2  # Yeni kutu kaç kez görüldükten sonra gösterilsin
+
+        matched_ids = set()
 
         for det in new_detections:
             best_id = None
             best_score = config.IOU_MATCH_THRESHOLD
             for bid, sbox in self.stable_boxes.items():
+                if bid in matched_ids:
+                    continue
                 score = self.iou(det['rect'], sbox['rect'])
                 if score > best_score:
                     best_score = score
@@ -1622,41 +1667,50 @@ class CameraManager:
 
             if best_id is None:
                 # ── Fallback Matching (Yedek Eşleştirme) ──
-                # IoU tutmadı ama belki kutu çok büyüdü/küçüldü veya hafif kaydı.
-                # Eğer aynı metin ve merkez noktası çok yakınsa, yine de eşleştir.
                 for bid, sbox in self.stable_boxes.items():
-                    # Aynı metin mi?
+                    if bid in matched_ids:
+                        continue
                     if sbox['text'] == det['text']:
-                        # Merkezleri yakın mı? (Örn: 50px içinde)
                         ocx = sbox['rect'][0] + sbox['rect'][2]/2
                         ocy = sbox['rect'][1] + sbox['rect'][3]/2
                         ncx = det['rect'][0] + det['rect'][2]/2
                         ncy = det['rect'][1] + det['rect'][3]/2
                         dist = ((ocx-ncx)**2 + (ocy-ncy)**2)**0.5
-                        
-                        if dist < 50:
+                        if dist < 80:
                             best_id = bid
                             break
 
             if best_id is not None:
-                # Aniden 1.5x'ten fazla büyüyen kutuları reddet (sapıtma koruması)
+                matched_ids.add(best_id)
                 old_rect = self.stable_boxes[best_id]['rect']
                 old_area = old_rect[2] * old_rect[3]
                 new_area = det['rect'][2] * det['rect'][3]
                 
-                # Eğer çok büyüdüyse, sadece 'görüldü' bilgisini güncelle, koordinatları güncelleme
+                # Ani büyüme koruması
                 if old_area > 0 and new_area > old_area * config.BOX_GROWTH_LIMIT:
                     self.stable_boxes[best_id]['last_seen'] = now
                 else:
-                    self.stable_boxes[best_id]['rect'] = det['rect']
+                    # EMA ile yumuşak güncelleme (titreme önleme)
+                    ox, oy, ow, oh = old_rect
+                    nx, ny, nw, nh = det['rect']
+                    smooth_rect = (
+                        int(ox + EMA_ALPHA * (nx - ox)),
+                        int(oy + EMA_ALPHA * (ny - oy)),
+                        int(ow + EMA_ALPHA * (nw - ow)),
+                        int(oh + EMA_ALPHA * (nh - oh)),
+                    )
+                    self.stable_boxes[best_id]['rect'] = smooth_rect
                     self.stable_boxes[best_id]['text'] = det['text']
                     self.stable_boxes[best_id]['last_seen'] = now
+                    self.stable_boxes[best_id]['seen_count'] = self.stable_boxes[best_id].get('seen_count', 0) + 1
             else:
+                # Yeni kutu — henüz gösterilmeyecek (seen_count < MIN_SEEN_COUNT)
                 self.box_id_counter += 1
                 self.stable_boxes[self.box_id_counter] = {
                     'rect': det['rect'],
                     'text': det['text'],
                     'last_seen': now,
+                    'seen_count': 1,
                 }
 
         # Süresi dolmuş kutuları temizle
@@ -1789,6 +1843,9 @@ class CameraManager:
                         self.update_stable_boxes(new_detections)
                         self.ocr_results = []
                         for sb in self.stable_boxes.values():
+                            # Yeterince görülmemiş kutuları atla (gürültü filtresi)
+                            if sb.get('seen_count', 0) < 2:
+                                continue
                             x, y, w, h = sb['rect']
                             # Merkez noktası hesapla
                             cx = x + w // 2
@@ -1806,7 +1863,9 @@ class CameraManager:
                 if elapsed > 0:
                     self.ocr_fps = 1.0 / elapsed
 
-            time.sleep(0.001)
+                time.sleep(0.02) # OCR arası kısa dinlenme (~30 FPS maks)
+            else:
+                time.sleep(0.05)
 
         api.End()
         log.info("OCR worker durduruldu.")
@@ -1997,9 +2056,21 @@ class CameraManager:
                 except Exception as e:
                     pass # PIP hatası akışı bozmasın
 
+            # ── JPEG Şifrelemeyi kilit dışında yap (CPU tasarrufu ve akıcılık) ──
+            _, jpeg = cv2.imencode('.jpg', display, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            jpeg_bytes = jpeg.tobytes()
+
+            if self.raw_display_frame is not None:
+                _, jpeg_raw = cv2.imencode('.jpg', self.raw_display_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                raw_bytes = jpeg_raw.tobytes()
+            else:
+                raw_bytes = None
+
             # Annotasyonlu frame'i kaydet (stream için)
             with self.frame_lock:
                 self.annotated_frame = display.copy()
+                self.annotated_jpeg = jpeg_bytes
+                self.raw_jpeg_bytes = raw_bytes
 
             time.sleep(0.001)
 
@@ -2008,22 +2079,12 @@ class CameraManager:
     def get_mjpeg_frame(self):
         """Annotasyonlu frame'i JPEG olarak döndür (MJPEG stream için)."""
         with self.frame_lock:
-            if self.annotated_frame is None:
-                return None
-            _, jpeg = cv2.imencode('.jpg', self.annotated_frame, [
-                cv2.IMWRITE_JPEG_QUALITY, 80
-            ])
-            return jpeg.tobytes()
+            return self.annotated_jpeg
 
     def get_raw_mjpeg_frame(self):
         """Temiz (annotasyonsuz) frame'i JPEG olarak döndür."""
         with self.frame_lock:
-            if self.raw_display_frame is None:
-                return None
-            _, jpeg = cv2.imencode('.jpg', self.raw_display_frame, [
-                cv2.IMWRITE_JPEG_QUALITY, 80
-            ])
-            return jpeg.tobytes()
+            return self.raw_jpeg_bytes
 
     def find_target_text(self, specific_word=None):
         """
@@ -2506,6 +2567,7 @@ def generate_mjpeg():
                 b'--frame\r\n'
                 b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n'
             )
+            time.sleep(0.04) # Ortalama 25 FPS ile sına - CPU aşırı kullanımını önler
         else:
             time.sleep(0.05)
 
@@ -2529,6 +2591,7 @@ def generate_mjpeg_raw():
                 b'--frame\r\n'
                 b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n'
             )
+            time.sleep(0.04) # Ortalama 25 FPS ile sına
         else:
             time.sleep(0.05)
 

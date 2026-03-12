@@ -7,7 +7,7 @@ const MAX_LOG = 300;
 document.addEventListener('DOMContentLoaded', () => {
     initSocket(); loadConfig(); loadWords(); loadErrors();
     addC('Arayüz yüklendi. Ok tuşları=Hareket, H=Home, C=Center, E=Acil Durdur', 'info');
-    setInterval(pollGrbl, 2000);
+    setInterval(pollGrbl, 5000);
     setInterval(pollUptime, 5000);
     // Apply saved theme
     const t = localStorage.getItem('pnp-theme') || 'dark';

@@ -49,7 +49,7 @@
   "fine_tune_step_mm": 0.05,
   "fine_tune_enabled": true,
   "stream_max_width": 800,
-  "selected_target_word": "AYD",
+  "selected_target_word": "CRB",
   "ocr_confidence": 40,
   "ocr_psm_mode": 6,
   "ocr_whitelist": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
@@ -79,5 +79,5 @@
   "nozzle_adc_sample_count": 20,
   "nozzle_diode_threshold": 500,
   "nozzle_test_count": 10,
-  "nozzle_test_interval": 0.1
+  "nozzle_test_interval": 1.0
 }

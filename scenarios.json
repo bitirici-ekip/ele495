@@ -1,361 +1,5 @@
 [
   {
-    "name": "AYD to D2",
-    "steps": [
-      {
-        "base_name": "KOMPONENT BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 5,
-        "type": "delay"
-      },
-      {
-        "type": "auto_center",
-        "word": "AYD"
-      },
-      {
-        "seconds": 7,
-        "type": "delay"
-      },
-      {
-        "type": "move_z",
-        "z": -166
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "type": "pump_on"
-      },
-      {
-        "seconds": 5,
-        "type": "delay"
-      },
-      {
-        "type": "move_z",
-        "z": 0
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "base_name": "PCB BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 10,
-        "type": "delay"
-      },
-      {
-        "base_name": "D2 PCB",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "type": "pump_off"
-      },
-      {
-        "seconds": 5,
-        "type": "delay"
-      },
-      {
-        "type": "move_z",
-        "z": 0
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "base_name": "PCB BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 10,
-        "type": "delay"
-      },
-      {
-        "type": "verify"
-      },
-      {
-        "type": "home"
-      }
-    ]
-  },
-  {
-    "name": "CRB to R1",
-    "steps": [
-      {
-        "base_name": "KOMPONENT BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 5,
-        "type": "delay"
-      },
-      {
-        "type": "auto_center",
-        "word": "CRB"
-      },
-      {
-        "seconds": 7,
-        "type": "delay"
-      },
-      {
-        "type": "move_z",
-        "z": -166
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "type": "pump_on"
-      },
-      {
-        "seconds": 5,
-        "type": "delay"
-      },
-      {
-        "type": "move_z",
-        "z": 0
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "base_name": "PCB BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 10,
-        "type": "delay"
-      },
-      {
-        "base_name": "R1 PCB",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "type": "pump_off"
-      },
-      {
-        "seconds": 5,
-        "type": "delay"
-      },
-      {
-        "type": "move_z",
-        "z": 0
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "base_name": "PCB BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 10,
-        "type": "delay"
-      },
-      {
-        "type": "verify"
-      },
-      {
-        "type": "home"
-      }
-    ]
-  },
-  {
-    "name": "SHN to R2",
-    "steps": [
-      {
-        "base_name": "KOMPONENT BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 5,
-        "type": "delay"
-      },
-      {
-        "type": "auto_center",
-        "word": "SHN"
-      },
-      {
-        "seconds": 7,
-        "type": "delay"
-      },
-      {
-        "type": "move_z",
-        "z": -166
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "type": "pump_on"
-      },
-      {
-        "seconds": 5,
-        "type": "delay"
-      },
-      {
-        "type": "move_z",
-        "z": 0
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "base_name": "PCB BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 10,
-        "type": "delay"
-      },
-      {
-        "base_name": "R2 PCB",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "type": "pump_off"
-      },
-      {
-        "seconds": 5,
-        "type": "delay"
-      },
-      {
-        "type": "move_z",
-        "z": 0
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "base_name": "PCB BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 10,
-        "type": "delay"
-      },
-      {
-        "type": "verify"
-      },
-      {
-        "type": "home"
-      }
-    ]
-  },
-  {
-    "name": "MUS to D1",
-    "steps": [
-      {
-        "base_name": "KOMPONENT BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 5,
-        "type": "delay"
-      },
-      {
-        "type": "auto_center",
-        "word": "MUS"
-      },
-      {
-        "seconds": 7,
-        "type": "delay"
-      },
-      {
-        "type": "move_z",
-        "z": -166
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "type": "pump_on"
-      },
-      {
-        "seconds": 5,
-        "type": "delay"
-      },
-      {
-        "type": "move_z",
-        "z": 0
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "base_name": "PCB BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 10,
-        "type": "delay"
-      },
-      {
-        "type": "goto_base",
-        "base_name": "D1 PCB"
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "type": "pump_off"
-      },
-      {
-        "seconds": 5,
-        "type": "delay"
-      },
-      {
-        "type": "move_z",
-        "z": 0
-      },
-      {
-        "seconds": 20,
-        "type": "delay"
-      },
-      {
-        "base_name": "PCB BASE",
-        "type": "goto_base"
-      },
-      {
-        "seconds": 10,
-        "type": "delay"
-      },
-      {
-        "type": "verify"
-      },
-      {
-        "type": "home"
-      }
-    ]
-  },
-  {
     "name": "CRB YOLU",
     "steps": [
       {
@@ -376,7 +20,7 @@
       },
       {
         "type": "move_z",
-        "z": -165.5
+        "z": -168
       },
       {
         "seconds": 16,
@@ -407,7 +51,7 @@
       },
       {
         "type": "move_z",
-        "z": -165
+        "z": -167
       },
       {
         "seconds": 5,
@@ -417,66 +61,9 @@
         "type": "resistance_read"
       },
       {
-        "fail_steps": [
-          {
-            "seconds": 5,
-            "type": "delay"
-          },
-          {
-            "type": "move_z",
-            "z": -150
-          },
-          {
-            "seconds": 7,
-            "type": "delay"
-          },
-          {
-            "base_name": "R2 PCB",
-            "type": "goto_base"
-          },
-          {
-            "seconds": 9,
-            "type": "delay"
-          },
-          {
-            "type": "move_z",
-            "z": -168
-          },
-          {
-            "seconds": 3,
-            "type": "delay"
-          },
-          {
-            "type": "pump_off"
-          },
-          {
-            "seconds": 5,
-            "type": "delay"
-          },
-          {
-            "type": "move_z",
-            "z": 0
-          },
-          {
-            "seconds": 17.5,
-            "type": "delay"
-          },
-          {
-            "base_name": "PCB FOTO",
-            "type": "goto_base"
-          },
-          {
-            "seconds": 8,
-            "type": "delay"
-          },
-          {
-            "type": "verify"
-          },
-          {
-            "seconds": 7,
-            "type": "delay"
-          }
-        ],
+        "type": "if_resistance",
+        "target_resistance": 22000,
+        "tolerance_percent": 10,
         "pass_steps": [
           {
             "seconds": 5,
@@ -500,7 +87,7 @@
           },
           {
             "type": "move_z",
-            "z": -167
+            "z": -173
           },
           {
             "seconds": 3,
@@ -537,9 +124,66 @@
             "type": "delay"
           }
         ],
-        "target_resistance": 22000,
-        "tolerance_percent": 10,
-        "type": "if_resistance"
+        "fail_steps": [
+          {
+            "seconds": 5,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": -150
+          },
+          {
+            "seconds": 7,
+            "type": "delay"
+          },
+          {
+            "base_name": "R2 PCB",
+            "type": "goto_base"
+          },
+          {
+            "seconds": 9,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": -173
+          },
+          {
+            "seconds": 3,
+            "type": "delay"
+          },
+          {
+            "type": "pump_off"
+          },
+          {
+            "seconds": 5,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": 0
+          },
+          {
+            "seconds": 17.5,
+            "type": "delay"
+          },
+          {
+            "base_name": "PCB FOTO",
+            "type": "goto_base"
+          },
+          {
+            "seconds": 8,
+            "type": "delay"
+          },
+          {
+            "type": "verify"
+          },
+          {
+            "seconds": 7,
+            "type": "delay"
+          }
+        ]
       }
     ]
   },
@@ -564,7 +208,7 @@
       },
       {
         "type": "move_z",
-        "z": -166
+        "z": -168
       },
       {
         "seconds": 16,
@@ -595,7 +239,7 @@
       },
       {
         "type": "move_z",
-        "z": -165
+        "z": -167
       },
       {
         "seconds": 5,
@@ -605,66 +249,9 @@
         "type": "resistance_read"
       },
       {
-        "fail_steps": [
-          {
-            "seconds": 5,
-            "type": "delay"
-          },
-          {
-            "type": "move_z",
-            "z": -150
-          },
-          {
-            "seconds": 7,
-            "type": "delay"
-          },
-          {
-            "base_name": "R1 PCB",
-            "type": "goto_base"
-          },
-          {
-            "seconds": 9,
-            "type": "delay"
-          },
-          {
-            "type": "move_z",
-            "z": -168
-          },
-          {
-            "seconds": 3,
-            "type": "delay"
-          },
-          {
-            "type": "pump_off"
-          },
-          {
-            "seconds": 5,
-            "type": "delay"
-          },
-          {
-            "type": "move_z",
-            "z": 0
-          },
-          {
-            "seconds": 17.5,
-            "type": "delay"
-          },
-          {
-            "base_name": "PCB FOTO",
-            "type": "goto_base"
-          },
-          {
-            "seconds": 8,
-            "type": "delay"
-          },
-          {
-            "type": "verify"
-          },
-          {
-            "seconds": 7,
-            "type": "delay"
-          }
-        ],
+        "type": "if_resistance",
+        "target_resistance": 1000,
+        "tolerance_percent": 10,
         "pass_steps": [
           {
             "seconds": 5,
@@ -688,7 +275,7 @@
           },
           {
             "type": "move_z",
-            "z": -168
+            "z": -173
           },
           {
             "seconds": 3,
@@ -725,9 +312,66 @@
             "type": "delay"
           }
         ],
-        "target_resistance": 1000,
-        "tolerance_percent": 10,
-        "type": "if_resistance"
+        "fail_steps": [
+          {
+            "seconds": 5,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": -150
+          },
+          {
+            "seconds": 7,
+            "type": "delay"
+          },
+          {
+            "base_name": "R1 PCB",
+            "type": "goto_base"
+          },
+          {
+            "seconds": 9,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": -173
+          },
+          {
+            "seconds": 3,
+            "type": "delay"
+          },
+          {
+            "type": "pump_off"
+          },
+          {
+            "seconds": 5,
+            "type": "delay"
+          },
+          {
+            "type": "move_z",
+            "z": 0
+          },
+          {
+            "seconds": 17.5,
+            "type": "delay"
+          },
+          {
+            "base_name": "PCB FOTO",
+            "type": "goto_base"
+          },
+          {
+            "seconds": 8,
+            "type": "delay"
+          },
+          {
+            "type": "verify"
+          },
+          {
+            "seconds": 7,
+            "type": "delay"
+          }
+        ]
       }
     ]
   },
@@ -747,12 +391,12 @@
         "word": "AYD"
       },
       {
-        "type": "delay",
-        "seconds": 10
+        "seconds": 10,
+        "type": "delay"
       },
       {
         "type": "move_z",
-        "z": -166
+        "z": -169.3
       },
       {
         "seconds": 16,
@@ -783,7 +427,7 @@
       },
       {
         "type": "move_z",
-        "z": -162.5
+        "z": -161.4
       },
       {
         "seconds": 5,
@@ -830,6 +474,14 @@
       },
       {
         "seconds": 10,
+        "type": "delay"
+      },
+      {
+        "type": "move_z",
+        "z": -169.6
+      },
+      {
+        "seconds": 7,
         "type": "delay"
       },
       {
@@ -893,7 +545,7 @@
       },
       {
         "type": "move_z",
-        "z": -166
+        "z": -169.3
       },
       {
         "seconds": 16,
@@ -924,7 +576,7 @@
       },
       {
         "type": "move_z",
-        "z": -162.5
+        "z": -161.4
       },
       {
         "seconds": 5,
@@ -971,6 +623,14 @@
       },
       {
         "seconds": 10,
+        "type": "delay"
+      },
+      {
+        "type": "move_z",
+        "z": -169.6
+      },
+      {
+        "seconds": 7,
         "type": "delay"
       },
       {
