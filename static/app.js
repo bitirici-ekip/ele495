@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     addC('Arayüz yüklendi. Ok tuşları=Hareket, H=Home, C=Center, E=Acil Durdur', 'info');
     setInterval(pollGrbl, 5000);
     setInterval(pollUptime, 5000);
+    setInterval(pollSystemInfo, 5000);
+    pollSystemInfo();
     // Apply saved theme
     const t = localStorage.getItem('pnp-theme') || 'dark';
     document.documentElement.setAttribute('data-theme', t);
@@ -33,7 +35,28 @@ function initSocket() {
     socket.on('status_update', (d) => {
         if (d.motor) updateMotor(d.motor);
         if (d.camera_fps !== undefined) $('fpsCam').textContent = d.camera_fps.toFixed(0);
-        if (d.ocr_fps !== undefined) $('fpsOcr').textContent = d.ocr_fps.toFixed(1);
+        if (d.ocr_fps !== undefined) {
+            let el = $('fpsOcr');
+            if (el) el.textContent = d.ocr_fps.toFixed(1);
+        }
+        if (d.ocr_enabled !== undefined) {
+            let badge = $('ocrStateBadge'), wrap = $('fpsOcrWrap');
+            if (badge && wrap) {
+                if (d.ocr_enabled) {
+                    if (badge.textContent !== 'AÇIK') {
+                        badge.textContent = 'AÇIK';
+                        badge.style.color = '#4caf50';
+                        wrap.style.display = 'inline';
+                    }
+                } else {
+                    if (badge.textContent !== 'KAPALI') {
+                        badge.textContent = 'KAPALI';
+                        badge.style.color = '#f44336';
+                        wrap.style.display = 'none';
+                    }
+                }
+            }
+        }
         if (d.ocr) updateOCR(d.ocr);
         if (d.config) applyConfig(d.config);
     });
@@ -380,10 +403,17 @@ function updateGrblState(state, alarm) {
 
 /* ═══ OCR ═══ */
 function updateOCR(results) {
-    $('detCnt').textContent = results.length;
-    $('ocrCnt2').textContent = results.length;
-    if (!results.length) { $('ocrList').innerHTML = '<div class="ocr-empty">Yazı algılanmadı</div>'; $('tgtSt').textContent = 'Aranıyor'; $('tgtSt').className = 'mono tgt-search'; return; }
-    // Get target words
+    const detCntEl = $('detCnt');
+    const ocrCnt2El = $('ocrCnt2');
+    const ocrListEl = $('ocrList');
+    const tgtStEl = $('tgtSt');
+    if (detCntEl) detCntEl.textContent = results.length;
+    if (ocrCnt2El) ocrCnt2El.textContent = results.length;
+    if (!results.length) {
+        if (ocrListEl) ocrListEl.innerHTML = '<div class="ocr-empty">Yazı algılanmadı</div>';
+        if (tgtStEl) { tgtStEl.textContent = 'Aranıyor'; tgtStEl.className = 'mono tgt-search'; }
+        return;
+    }
     const chips = document.querySelectorAll('.word-chip');
     const words = []; chips.forEach(c => { const t = c.getAttribute('data-word'); if (t) words.push(t.toUpperCase()); });
     let found = false, h = '';
@@ -394,9 +424,11 @@ function updateOCR(results) {
             <span class="ocr-text" ${hit ? 'style="color:var(--green)"' : ''}>${hit ? '🎯 ' : ''}${esc(r.text)}</span>
             <span class="ocr-coords">⊕${r.center[0]},${r.center[1]}</span></div>`;
     });
-    $('ocrList').innerHTML = h;
-    $('tgtSt').textContent = found ? 'Bulundu ✓' : 'Aranıyor';
-    $('tgtSt').className = 'mono ' + (found ? 'tgt-found' : 'tgt-search');
+    if (ocrListEl) ocrListEl.innerHTML = h;
+    if (tgtStEl) {
+        tgtStEl.textContent = found ? 'Bulundu ✓' : 'Aranıyor';
+        tgtStEl.className = 'mono ' + (found ? 'tgt-found' : 'tgt-search');
+    }
 }
 
 /* ═══ TABS ═══ */
@@ -687,10 +719,11 @@ async function loadErrors() { refreshErrors(); }
 async function refreshErrors() { try { const r = await fetch('/api/errors').then(r => r.json()); renderErrors(r.errors || []); } catch (e) { } }
 function renderErrors(errs) {
     const el = $('errorList');
+    if (!el) return;
     if (!errs.length) { el.innerHTML = '<div class="ocr-empty">Hata yok ✓</div>'; return; }
     el.innerHTML = errs.slice().reverse().map(e => `<div class="error-item"><span class="et">${e.timestamp}</span><span>${esc(e.message)}</span></div>`).join('');
 }
-async function clearErrors() { await api('/api/errors/clear'); $('errorList').innerHTML = '<div class="ocr-empty">Hata yok ✓</div>'; addC('Hata geçmişi temizlendi.', 'info'); }
+async function clearErrors() { await api('/api/errors/clear'); const el = $('errorList'); if (el) el.innerHTML = '<div class="ocr-empty">Hata yok ✓</div>'; addC('Hata geçmişi temizlendi.', 'info'); }
 
 /* ═══ STEP ═══ */
 /* ═══ STEP ═══ */
@@ -708,6 +741,86 @@ function changeStep(dir) {
 /* ═══ POLLING ═══ */
 function pollGrbl() { fetch('/api/grbl_status').then(r => r.json()).then(d => updateMotor(d)).catch(() => { }); }
 function pollUptime() { fetch('/api/uptime').then(r => r.json()).then(d => { $('uptimeEl').textContent = '⏱ ' + d.uptime_formatted; $('sysUptime').textContent = d.uptime_formatted; }).catch(() => { }); }
+function pollSystemInfo() {
+    fetch('/api/system_info').then(r => r.json()).then(d => updateSystemInfo(d)).catch(() => { });
+}
+function updateSystemInfo(d) {
+    // Header güncelleme — Sıcaklık
+    const tempStr = d.cpu_temp !== null ? d.cpu_temp + '°C' : 'N/A';
+    const hTemp = $('headerCpuTemp');
+    if (hTemp) {
+        hTemp.textContent = tempStr;
+        if (d.cpu_temp !== null) {
+            hTemp.style.color = d.cpu_temp > 70 ? '#ef5350' : d.cpu_temp > 55 ? '#ffa726' : '#66bb6a';
+        }
+    }
+    // Header — CPU
+    const hCpu = $('headerCpuPct');
+    if (hCpu) {
+        hCpu.textContent = d.cpu_percent + '%';
+        hCpu.style.color = d.cpu_percent > 80 ? '#ef5350' : d.cpu_percent > 50 ? '#ffa726' : '#42a5f5';
+    }
+    // Header — RAM (yüzde + bar)
+    const hRam = $('headerRamPct');
+    if (hRam) {
+        hRam.textContent = d.ram_percent + '%';
+        hRam.style.color = d.ram_percent > 85 ? '#ef5350' : d.ram_percent > 60 ? '#ffa726' : '#66bb6a';
+    }
+    const hRamBar = $('headerRamBar');
+    if (hRamBar) {
+        hRamBar.style.width = d.ram_percent + '%';
+        hRamBar.style.background = d.ram_percent > 85 ? '#ef5350' : d.ram_percent > 60 ? '#ffa726' : '#66bb6a';
+    }
+    // Header — Uptime
+    const hUptime = $('headerUptime');
+    if (hUptime && d.uptime_formatted) {
+        hUptime.textContent = d.uptime_formatted;
+    }
+    // Ayarlar sekmesi — Sistem Monitörü
+    const sTemp = $('sysMonTemp');
+    if (sTemp) {
+        sTemp.textContent = tempStr;
+        if (d.cpu_temp !== null) {
+            sTemp.style.color = d.cpu_temp > 70 ? '#ef5350' : d.cpu_temp > 55 ? '#ffa726' : '#66bb6a';
+        }
+    }
+    const sCpu = $('sysMonCpu');
+    if (sCpu) {
+        sCpu.textContent = d.cpu_percent + '%';
+        sCpu.style.color = d.cpu_percent > 80 ? '#ef5350' : d.cpu_percent > 50 ? '#ffa726' : '#42a5f5';
+    }
+    // RAM bar
+    const rText = $('sysMonRamText');
+    if (rText) rText.textContent = d.ram_used_gb + ' / ' + d.ram_total_gb + ' GB';
+    const rBar = $('sysMonRamBar');
+    if (rBar) {
+        rBar.style.width = d.ram_percent + '%';
+        rBar.style.background = d.ram_percent > 85 ? 'linear-gradient(90deg,#c62828,#ef5350)' : d.ram_percent > 60 ? 'linear-gradient(90deg,#ef6c00,#ffa726)' : 'linear-gradient(90deg,#43a047,#66bb6a)';
+    }
+    const rPct = $('sysMonRamPct');
+    if (rPct) rPct.textContent = d.ram_percent;
+    // Disk bar
+    const dText = $('sysMonDiskText');
+    if (dText) dText.textContent = d.disk_used_gb + ' / ' + d.disk_total_gb + ' GB';
+    const dBar = $('sysMonDiskBar');
+    if (dBar) {
+        dBar.style.width = d.disk_percent + '%';
+        dBar.style.background = d.disk_percent > 85 ? 'linear-gradient(90deg,#c62828,#ef5350)' : d.disk_percent > 60 ? 'linear-gradient(90deg,#ef6c00,#ffa726)' : 'linear-gradient(90deg,#ef6c00,#ffa726)';
+    }
+    const dPct = $('sysMonDiskPct');
+    if (dPct) dPct.textContent = d.disk_percent;
+    // Sistem detayları
+    const sHost = $('sysMonHostname');
+    if (sHost) sHost.textContent = d.hostname || '--';
+    const sIP = $('sysMonIP');
+    if (sIP) sIP.textContent = d.ip_address || '--';
+    const sCores = $('sysMonCores');
+    if (sCores) sCores.textContent = d.cpu_count || '--';
+    const sPy = $('sysMonPython');
+    if (sPy) sPy.textContent = d.python_version || '--';
+    const sUp = $('sysMonUptime');
+    if (sUp) sUp.textContent = d.uptime_formatted || '--';
+}
 
 /* ═══ CONSOLE ═══ */
 function addC(msg, lvl = 'info') { const c = $('console'), t = new Date().toLocaleTimeString('tr-TR'); const ln = document.createElement('div'); ln.className = 'cline ' + lvl; ln.innerHTML = `<span class="ct">[${t}]</span> ${esc(msg)}`; c.appendChild(ln); while (c.children.length > MAX_LOG) c.removeChild(c.firstChild); c.scrollTop = c.scrollHeight; }
@@ -1221,6 +1334,8 @@ function createNewScenario() {
 // — Sub-step state for IF blocks —
 let _ifResPassSteps = [], _ifResFailSteps = [];
 let _ifDiodePassSteps = [], _ifDiodeFailSteps = [];
+let _editingSubStep = { prefix: null, branch: null, index: -1 };
+let _insertSubStep = { prefix: null, branch: null, index: -1 };
 
 function _getSubStepArray(prefix, branch) {
     if (prefix === 'ifRes') return branch === 'pass' ? _ifResPassSteps : _ifResFailSteps;
@@ -1300,6 +1415,7 @@ function _buildSubStepRow(prefix, branch, color) {
     const typeId = prefix + (branch === 'pass' ? 'PassStepType' : 'FailStepType');
     const paramContId = prefix + (branch === 'pass' ? 'PassParamCont' : 'FailParamCont');
     const paramId = prefix + (branch === 'pass' ? 'PassStepParam' : 'FailStepParam');
+    const btnId = prefix + (branch === 'pass' ? 'PassAddBtn' : 'FailAddBtn');
     let baseOpts = _basesList.map(b => `<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('');
     return `<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
         <select class="cfg-in" id="${typeId}" style="flex:1;font-size:0.75rem;min-width:120px" onchange="onSubStepTypeChange('${prefix}','${branch}')">
@@ -1308,7 +1424,7 @@ function _buildSubStepRow(prefix, branch, color) {
         <div id="${paramContId}" style="flex:1;min-width:100px;display:flex">
             <select class="cfg-in" id="${paramId}" style="flex:1;font-size:0.75rem">${baseOpts}</select>
         </div>
-        <button class="btn-sm" style="background:${color};color:#fff;font-size:0.7rem" onclick="addSubStep('${prefix}','${branch}')">+</button>
+        <button id="${btnId}" class="btn-sm" style="background:${color};color:#fff;font-size:0.7rem;padding:2px 8px" onclick="addSubStep('${prefix}','${branch}')">+</button>
     </div>`;
 }
 
@@ -1317,11 +1433,75 @@ function addSubStep(prefix, branch) {
     const paramId = prefix + (branch === 'pass' ? 'PassStepParam' : 'FailStepParam');
     const step = _buildSubStep(typeId, paramId);
     const arr = _getSubStepArray(prefix, branch);
-    arr.push(step);
+    
+    if (_editingSubStep.prefix === prefix && _editingSubStep.branch === branch && _editingSubStep.index >= 0) {
+        arr[_editingSubStep.index] = step;
+        _editingSubStep = { prefix: null, branch: null, index: -1 };
+        const btnId = prefix + (branch === 'pass' ? 'PassAddBtn' : 'FailAddBtn');
+        const btn = $(btnId);
+        if (btn) { btn.innerHTML = '+'; btn.style.background = (branch === 'pass' ? '#4caf50' : '#f44336'); }
+    } else if (_insertSubStep.prefix === prefix && _insertSubStep.branch === branch && _insertSubStep.index >= 0 && _insertSubStep.index <= arr.length) {
+        arr.splice(_insertSubStep.index, 0, step);
+        _insertSubStep = { prefix: null, branch: null, index: -1 };
+        const btnId = prefix + (branch === 'pass' ? 'PassAddBtn' : 'FailAddBtn');
+        const btn = $(btnId);
+        if (btn) { btn.innerHTML = '+'; btn.style.background = (branch === 'pass' ? '#4caf50' : '#f44336'); }
+    } else {
+        arr.push(step);
+    }
+    renderSubSteps(prefix, branch);
+}
+
+function editSubStep(prefix, branch, idx) {
+    const arr = _getSubStepArray(prefix, branch);
+    if (idx < 0 || idx >= arr.length) return;
+    const step = arr[idx];
+    _editingSubStep = { prefix, branch, index: idx };
+
+    const typeId = prefix + (branch === 'pass' ? 'PassStepType' : 'FailStepType');
+    const typeSel = $(typeId);
+    if (typeSel) {
+        typeSel.value = step.type;
+        onSubStepTypeChange(prefix, branch);
+    }
+
+    setTimeout(() => {
+        const paramId = prefix + (branch === 'pass' ? 'PassStepParam' : 'FailStepParam');
+        const pSel = $(paramId);
+        if (pSel) {
+            if (step.type === 'goto_base') pSel.value = step.base_name;
+            else if (step.type === 'auto_center') pSel.value = step.word;
+            else if (step.type === 'delay') pSel.value = step.seconds;
+            else if (step.type === 'move_z') pSel.value = step.z;
+            else if (step.type === 'nozzle_goto') pSel.value = step.angle;
+        }
+    }, 0);
+
+    const btnId = prefix + (branch === 'pass' ? 'PassAddBtn' : 'FailAddBtn');
+    const btn = $(btnId);
+    if (btn) {
+        btn.innerHTML = '📝 Güncelle';
+        btn.style.background = 'var(--orange)';
+    }
     renderSubSteps(prefix, branch);
 }
 
 function removeSubStep(prefix, branch, idx) {
+    if (_editingSubStep.prefix === prefix && _editingSubStep.branch === branch && _editingSubStep.index === idx) {
+        _editingSubStep = { prefix: null, branch: null, index: -1 };
+        const btnId = prefix + (branch === 'pass' ? 'PassAddBtn' : 'FailAddBtn');
+        const btn = $(btnId);
+        if (btn) { btn.innerHTML = '+'; btn.style.background = (branch === 'pass' ? '#4caf50' : '#f44336'); }
+    } else if (_editingSubStep.prefix === prefix && _editingSubStep.branch === branch && _editingSubStep.index > idx) {
+        _editingSubStep.index--;
+    }
+    if (_insertSubStep.prefix === prefix && _insertSubStep.branch === branch) {
+        _insertSubStep = { prefix: null, branch: null, index: -1 };
+        const btnId = prefix + (branch === 'pass' ? 'PassAddBtn' : 'FailAddBtn');
+        const btn = $(btnId);
+        if (btn) { btn.innerHTML = '+'; btn.style.background = (branch === 'pass' ? '#4caf50' : '#f44336'); }
+    }
+
     const arr = _getSubStepArray(prefix, branch);
     arr.splice(idx, 1);
     renderSubSteps(prefix, branch);
@@ -1331,9 +1511,38 @@ function moveSubStep(prefix, branch, idx, dir) {
     const arr = _getSubStepArray(prefix, branch);
     const newIdx = idx + dir;
     if (newIdx < 0 || newIdx >= arr.length) return;
+    
+    if (_editingSubStep.prefix === prefix && _editingSubStep.branch === branch) {
+        if (_editingSubStep.index === idx) _editingSubStep.index = newIdx;
+        else if (_editingSubStep.index === newIdx) _editingSubStep.index = idx;
+    }
+
     const tmp = arr[idx];
     arr[idx] = arr[newIdx];
     arr[newIdx] = tmp;
+    renderSubSteps(prefix, branch);
+}
+
+function setInsertSubStep(prefix, branch, idx) {
+    _insertSubStep = { prefix, branch, index: idx };
+    _editingSubStep = { prefix: null, branch: null, index: -1 };
+    const btnId = prefix + (branch === 'pass' ? 'PassAddBtn' : 'FailAddBtn');
+    const btn = $(btnId);
+    if (btn) {
+        btn.innerHTML = `📌 Satır ${idx + 1}`;
+        btn.style.background = '#00897b';
+    }
+    renderSubSteps(prefix, branch);
+}
+
+function cancelInsertSubStep(prefix, branch) {
+    _insertSubStep = { prefix: null, branch: null, index: -1 };
+    const btnId = prefix + (branch === 'pass' ? 'PassAddBtn' : 'FailAddBtn');
+    const btn = $(btnId);
+    if (btn) {
+        btn.innerHTML = '+';
+        btn.style.background = (branch === 'pass' ? '#4caf50' : '#f44336');
+    }
     renderSubSteps(prefix, branch);
 }
 
@@ -1342,20 +1551,40 @@ function renderSubSteps(prefix, branch) {
     const cont = $(containerId);
     if (!cont) return;
     const arr = _getSubStepArray(prefix, branch);
-    if (!arr.length) {
-        cont.innerHTML = '<div style="font-size:0.7rem;color:#666;text-align:center;padding:4px">Henüz alt adım yok</div>';
-        return;
-    }
+    
     let h = '';
-    arr.forEach((s, i) => {
-        h += `<div style="display:flex;align-items:center;gap:4px;padding:2px 4px;font-size:0.72rem">
-            <span style="color:#888;min-width:18px">${i + 1}.</span>
-            <span style="flex:1;color:#ccc">${stepLabel(s)}</span>
-            <button class="btn-sm" style="background:rgba(255,255,255,0.1);color:#aaa;padding:1px 4px;font-size:0.6rem" onclick="moveSubStep('${prefix}','${branch}',${i},-1)" title="Yukarı">▲</button>
-            <button class="btn-sm" style="background:rgba(255,255,255,0.1);color:#aaa;padding:1px 4px;font-size:0.6rem" onclick="moveSubStep('${prefix}','${branch}',${i},1)" title="Aşağı">▼</button>
-            <button class="btn-sm" style="background:#d32f2f;color:#fff;padding:1px 4px;font-size:0.6rem" onclick="removeSubStep('${prefix}','${branch}',${i})">✗</button>
-        </div>`;
-    });
+
+    const isTopActive = (_insertSubStep.prefix === prefix && _insertSubStep.branch === branch && _insertSubStep.index === 0);
+    h += `<div style="display:flex; justify-content:center; padding:2px 0; margin-bottom:4px">
+        <button class="btn-sm" onclick="setInsertSubStep('${prefix}','${branch}',0)" style="padding:1px 8px; font-size:0.6rem; background:${isTopActive ? '#00897b' : 'rgba(255,255,255,0.06)'}; color:${isTopActive ? '#fff' : '#666'}; border:1px dashed ${isTopActive ? '#00897b' : '#555'}; border-radius:4px; cursor:pointer" title="En başa ekle">${isTopActive ? '📌 Buraya eklenecek' : '⊕ Buraya Ekle'}</button>
+        ${isTopActive ? `<button class="btn-sm" onclick="cancelInsertSubStep('${prefix}','${branch}')" style="padding:1px 6px; font-size:0.6rem; background:#d32f2f; color:#fff; border-radius:4px; margin-left:4px" title="İptal">✗</button>` : ''}
+    </div>`;
+
+    if (!arr.length) {
+        h += '<div style="font-size:0.7rem;color:#666;text-align:center;padding:4px">Henüz alt adım yok</div>';
+    } else {
+        arr.forEach((s, i) => {
+            const isEditing = (_editingSubStep.prefix === prefix && _editingSubStep.branch === branch && _editingSubStep.index === i);
+            const bg = isEditing ? 'rgba(245, 158, 11, 0.1)' : 'transparent';
+            const border = isEditing ? '1px solid var(--orange)' : 'none';
+
+            h += `<div style="display:flex;align-items:center;gap:4px;padding:3px 4px;font-size:0.72rem; background:${bg}; border:${border}; border-radius:4px; margin-bottom:2px">
+                <span style="color:#888;min-width:18px">${i + 1}.</span>
+                <span style="flex:1;color:#ccc">${stepLabel(s)}</span>
+                <button class="btn-sm" style="background:var(--blue);color:#fff;padding:1px 4px;font-size:0.6rem" onclick="editSubStep('${prefix}','${branch}',${i})" title="Düzenle">✎</button>
+                <button class="btn-sm" style="background:rgba(255,255,255,0.1);color:#aaa;padding:1px 4px;font-size:0.6rem" onclick="moveSubStep('${prefix}','${branch}',${i},-1)" title="Yukarı">▲</button>
+                <button class="btn-sm" style="background:rgba(255,255,255,0.1);color:#aaa;padding:1px 4px;font-size:0.6rem" onclick="moveSubStep('${prefix}','${branch}',${i},1)" title="Aşağı">▼</button>
+                <button class="btn-sm" style="background:#d32f2f;color:#fff;padding:1px 4px;font-size:0.6rem" onclick="removeSubStep('${prefix}','${branch}',${i})">✗</button>
+            </div>`;
+
+            const insertIdx = i + 1;
+            const isActive = (_insertSubStep.prefix === prefix && _insertSubStep.branch === branch && _insertSubStep.index === insertIdx);
+            h += `<div style="display:flex; justify-content:center; padding:1px 0; margin-bottom:2px">
+                <button class="btn-sm" onclick="setInsertSubStep('${prefix}','${branch}',${insertIdx})" style="padding:1px 8px; font-size:0.6rem; background:${isActive ? '#00897b' : 'rgba(255,255,255,0.06)'}; color:${isActive ? '#fff' : '#666'}; border:1px dashed ${isActive ? '#00897b' : '#555'}; border-radius:4px; cursor:pointer" title="Araya ekle">${isActive ? '📌 Buraya eklenecek' : '⊕ Buraya Ekle'}</button>
+                ${isActive ? `<button class="btn-sm" onclick="cancelInsertSubStep('${prefix}','${branch}')" style="padding:1px 6px; font-size:0.6rem; background:#d32f2f; color:#fff; border-radius:4px; margin-left:4px" title="İptal">✗</button>` : ''}
+            </div>`;
+        });
+    }
     cont.innerHTML = h;
 }
 
@@ -1403,6 +1632,8 @@ function onStepTypeChange() {
         </div>`;
         box.style.display = '';
         _ifResPassSteps = []; _ifResFailSteps = [];
+        _editingSubStep = { prefix: null, branch: null, index: -1 };
+        _insertSubStep = { prefix: null, branch: null, index: -1 };
         renderSubSteps('ifRes', 'pass'); renderSubSteps('ifRes', 'fail');
     } else if (type === 'if_diode') {
         let baseOpts = _basesList.map(b => `<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('');
@@ -1424,6 +1655,8 @@ function onStepTypeChange() {
         </div>`;
         box.style.display = '';
         _ifDiodePassSteps = []; _ifDiodeFailSteps = [];
+        _editingSubStep = { prefix: null, branch: null, index: -1 };
+        _insertSubStep = { prefix: null, branch: null, index: -1 };
         renderSubSteps('ifDiode', 'pass'); renderSubSteps('ifDiode', 'fail');
     } else {
         box.innerHTML = '';
@@ -1534,11 +1767,15 @@ function editScenarioStep(idx) {
             const tl = $('stepIfResTolerance'); if (tl) tl.value = step.tolerance_percent || 10;
             _ifResPassSteps = JSON.parse(JSON.stringify(step.pass_steps || []));
             _ifResFailSteps = JSON.parse(JSON.stringify(step.fail_steps || []));
+            _editingSubStep = { prefix: null, branch: null, index: -1 };
+            _insertSubStep = { prefix: null, branch: null, index: -1 };
             renderSubSteps('ifRes', 'pass'); renderSubSteps('ifRes', 'fail');
         } else if (step.type === 'if_diode') {
             const exp = $('stepIfDiodeExpected'); if (exp) exp.value = step.expected_passing ? 'true' : 'false';
             _ifDiodePassSteps = JSON.parse(JSON.stringify(step.pass_steps || []));
             _ifDiodeFailSteps = JSON.parse(JSON.stringify(step.fail_steps || []));
+            _editingSubStep = { prefix: null, branch: null, index: -1 };
+            _insertSubStep = { prefix: null, branch: null, index: -1 };
             renderSubSteps('ifDiode', 'pass'); renderSubSteps('ifDiode', 'fail');
         }
     }, 0);

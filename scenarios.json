@@ -15,12 +15,20 @@
         "word": "CRB"
       },
       {
-        "seconds": 10,
+        "seconds": 7,
+        "type": "delay"
+      },
+      {
+        "base_name": "CRB MERKEZ",
+        "type": "goto_base"
+      },
+      {
+        "seconds": 3,
         "type": "delay"
       },
       {
         "type": "move_z",
-        "z": -168
+        "z": -174
       },
       {
         "seconds": 16,
@@ -51,7 +59,7 @@
       },
       {
         "type": "move_z",
-        "z": -167
+        "z": -173.3
       },
       {
         "seconds": 5,
@@ -61,10 +69,7 @@
         "type": "resistance_read"
       },
       {
-        "type": "if_resistance",
-        "target_resistance": 22000,
-        "tolerance_percent": 10,
-        "pass_steps": [
+        "fail_steps": [
           {
             "seconds": 5,
             "type": "delay"
@@ -78,7 +83,7 @@
             "type": "delay"
           },
           {
-            "base_name": "R1 PCB",
+            "base_name": "R2 PCB",
             "type": "goto_base"
           },
           {
@@ -87,7 +92,7 @@
           },
           {
             "type": "move_z",
-            "z": -173
+            "z": -179.5
           },
           {
             "seconds": 3,
@@ -124,7 +129,7 @@
             "type": "delay"
           }
         ],
-        "fail_steps": [
+        "pass_steps": [
           {
             "seconds": 5,
             "type": "delay"
@@ -138,7 +143,7 @@
             "type": "delay"
           },
           {
-            "base_name": "R2 PCB",
+            "base_name": "R1 PCB",
             "type": "goto_base"
           },
           {
@@ -147,7 +152,7 @@
           },
           {
             "type": "move_z",
-            "z": -173
+            "z": -179.5
           },
           {
             "seconds": 3,
@@ -183,7 +188,10 @@
             "seconds": 7,
             "type": "delay"
           }
-        ]
+        ],
+        "target_resistance": 22000,
+        "tolerance_percent": 10,
+        "type": "if_resistance"
       }
     ]
   },
@@ -203,12 +211,20 @@
         "word": "SHN"
       },
       {
-        "seconds": 10,
+        "seconds": 7,
+        "type": "delay"
+      },
+      {
+        "base_name": "SHN MERKEZ",
+        "type": "goto_base"
+      },
+      {
+        "seconds": 5,
         "type": "delay"
       },
       {
         "type": "move_z",
-        "z": -168
+        "z": -174.1
       },
       {
         "seconds": 16,
@@ -239,7 +255,7 @@
       },
       {
         "type": "move_z",
-        "z": -167
+        "z": -173.3
       },
       {
         "seconds": 5,
@@ -249,10 +265,7 @@
         "type": "resistance_read"
       },
       {
-        "type": "if_resistance",
-        "target_resistance": 1000,
-        "tolerance_percent": 10,
-        "pass_steps": [
+        "fail_steps": [
           {
             "seconds": 5,
             "type": "delay"
@@ -266,7 +279,7 @@
             "type": "delay"
           },
           {
-            "base_name": "R2 PCB",
+            "base_name": "R1 PCB",
             "type": "goto_base"
           },
           {
@@ -275,7 +288,7 @@
           },
           {
             "type": "move_z",
-            "z": -173
+            "z": -179.5
           },
           {
             "seconds": 3,
@@ -312,7 +325,7 @@
             "type": "delay"
           }
         ],
-        "fail_steps": [
+        "pass_steps": [
           {
             "seconds": 5,
             "type": "delay"
@@ -326,7 +339,7 @@
             "type": "delay"
           },
           {
-            "base_name": "R1 PCB",
+            "base_name": "R2 PCB",
             "type": "goto_base"
           },
           {
@@ -335,7 +348,7 @@
           },
           {
             "type": "move_z",
-            "z": -173
+            "z": -179.5
           },
           {
             "seconds": 3,
@@ -371,7 +384,10 @@
             "seconds": 7,
             "type": "delay"
           }
-        ]
+        ],
+        "target_resistance": 1000,
+        "tolerance_percent": 10,
+        "type": "if_resistance"
       }
     ]
   },
@@ -391,12 +407,20 @@
         "word": "AYD"
       },
       {
-        "seconds": 10,
+        "seconds": 7,
+        "type": "delay"
+      },
+      {
+        "base_name": "AYD MERKEZ",
+        "type": "goto_base"
+      },
+      {
+        "seconds": 3,
         "type": "delay"
       },
       {
         "type": "move_z",
-        "z": -169.3
+        "z": -176
       },
       {
         "seconds": 16,
@@ -427,7 +451,7 @@
       },
       {
         "type": "move_z",
-        "z": -161.4
+        "z": -170
       },
       {
         "seconds": 5,
@@ -478,7 +502,7 @@
       },
       {
         "type": "move_z",
-        "z": -169.6
+        "z": -176
       },
       {
         "seconds": 7,
@@ -540,12 +564,20 @@
         "word": "MUS"
       },
       {
-        "seconds": 10,
+        "seconds": 7,
+        "type": "delay"
+      },
+      {
+        "base_name": "MUS MERKEZ",
+        "type": "goto_base"
+      },
+      {
+        "seconds": 3,
         "type": "delay"
       },
       {
         "type": "move_z",
-        "z": -169.3
+        "z": -176
       },
       {
         "seconds": 16,
@@ -576,7 +608,7 @@
       },
       {
         "type": "move_z",
-        "z": -161.4
+        "z": -170
       },
       {
         "seconds": 5,
@@ -627,7 +659,7 @@
       },
       {
         "type": "move_z",
-        "z": -169.6
+        "z": -176
       },
       {
         "seconds": 7,

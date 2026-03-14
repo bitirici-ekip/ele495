@@ -5,3 +5,4 @@ tesserocr
 pyserial
 flask
 flask-socketio
+psutil

@@ -16,10 +16,32 @@
     <!-- HEADER -->
     <header class="header">
         <div class="h-brand">
-            <div class="h-logo">P</div>
-            <div>
-                <div class="h-title">PNP Kontrol Merkezi</div>
-                <div class="h-sub">Pick & Place CNC v2.0</div>
+            <div id="headerSystemInfo"
+                style="display:flex; align-items:center; gap:12px; font-size:0.8rem; font-weight:500; font-family:'JetBrains Mono',monospace">
+                <div style="display:flex; flex-direction:column; align-items:flex-start; line-height:1.3">
+                    <span style="color:#999; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.5px">SICAKLIK</span>
+                    <span id="headerCpuTemp" style="font-weight:700; font-size:0.9rem">--°C</span>
+                </div>
+                <span style="opacity:0.15; font-size:1.2rem">|</span>
+                <div style="display:flex; flex-direction:column; align-items:flex-start; line-height:1.3">
+                    <span style="color:#999; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.5px">CPU</span>
+                    <span id="headerCpuPct" style="font-weight:700; font-size:0.9rem">--%</span>
+                </div>
+                <span style="opacity:0.15; font-size:1.2rem">|</span>
+                <div style="display:flex; flex-direction:column; align-items:flex-start; line-height:1.3">
+                    <span style="color:#999; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.5px">RAM</span>
+                    <div style="display:flex; align-items:center; gap:6px">
+                        <span id="headerRamPct" style="font-weight:700; font-size:0.9rem">--%</span>
+                        <div style="width:50px; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden">
+                            <div id="headerRamBar" style="width:0%; height:100%; border-radius:3px; background:#66bb6a; transition:width 0.5s ease, background 0.5s ease"></div>
+                        </div>
+                    </div>
+                </div>
+                <span style="opacity:0.15; font-size:1.2rem">|</span>
+                <div style="display:flex; flex-direction:column; align-items:flex-start; line-height:1.3">
+                    <span style="color:#999; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.5px">UPTIME</span>
+                    <span id="headerUptime" style="font-weight:700; font-size:0.9rem; color:#b0bec5">--:--:--</span>
+                </div>
             </div>
         </div>
         <div class="h-center">
@@ -165,7 +187,7 @@
                     <!-- TOP LEFT: Stats -->
                     <div class="cam-stats" id="camStats" style="font-size:1.1rem; font-weight:600">
                         <div class="stat-item">CAM: <span id="fpsCam">--</span> FPS</div>
-                        <div class="stat-item">OCR: <span id="fpsOcr">--</span> FPS</div>
+                        <div class="stat-item">OCR: <span id="ocrStateBadge" style="color:#f44336;font-weight:bold;">KAPALI</span> <span id="fpsOcrWrap" style="display:none;">- <span id="fpsOcr">--</span> FPS</span></div>
                     </div>
 
                     <!-- TOP RIGHT: Live Status -->
@@ -715,32 +737,78 @@
                 </div>
             </div>
 
-            <!-- OCR İZLEME -->
+            <!-- SİSTEM MONİTÖRÜ -->
             <div class="card">
                 <div class="card-h">
-                    <span class="card-t">📊 OCR İzleme</span>
-                    <button class="btn-sm" onclick="clearErrors()">Temizle</button>
+                    <span class="card-t">🖥️ Sistem Monitörü</span>
                 </div>
                 <div class="card-b" style="padding:12px">
-                    <div style="display:flex; gap:15px; margin-bottom:10px">
-                        <div style="flex:1; text-align:center; background:#111; border-radius:6px; padding:8px">
-                            <div style="font-size:0.7rem; color:#888">ALGILANAN</div>
-                            <div class="mono" id="detCnt" style="font-size:1.3rem; font-weight:bold; color:var(--blue)">
-                                0</div>
+                    <!-- CPU Sıcaklığı -->
+                    <div style="display:flex; gap:12px; margin-bottom:12px">
+                        <div
+                            style="flex:1; text-align:center; background:linear-gradient(135deg,#1a0a0a,#2a1515); border:1px solid rgba(244,67,54,0.2); border-radius:8px; padding:10px">
+                            <div
+                                style="font-size:0.65rem; color:#ef9a9a; font-weight:600; text-transform:uppercase; margin-bottom:4px">
+                                🌡️ CPU Sıcaklığı</div>
+                            <div id="sysMonTemp"
+                                style="font-size:1.4rem; font-weight:800; color:#ef5350; font-family:'JetBrains Mono',monospace">
+                                --°C</div>
                         </div>
-                        <div style="flex:1; text-align:center; background:#111; border-radius:6px; padding:8px">
-                            <div style="font-size:0.7rem; color:#888">HEDEF</div>
-                            <div id="tgtSt" class="mono tgt-search" style="font-size:0.9rem; font-weight:bold">Aranıyor
+                        <div
+                            style="flex:1; text-align:center; background:linear-gradient(135deg,#0a0a1a,#151525); border:1px solid rgba(66,165,245,0.2); border-radius:8px; padding:10px">
+                            <div
+                                style="font-size:0.65rem; color:#90caf9; font-weight:600; text-transform:uppercase; margin-bottom:4px">
+                                ⚡ CPU Kullanımı</div>
+                            <div id="sysMonCpu"
+                                style="font-size:1.4rem; font-weight:800; color:#42a5f5; font-family:'JetBrains Mono',monospace">
+                                --%</div>
+                        </div>
+                    </div>
+                    <!-- RAM -->
+                    <div style="margin-bottom:10px">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+                            <span style="font-size:0.75rem; color:#aaa; font-weight:600">💾 RAM</span>
+                            <span id="sysMonRamText"
+                                style="font-size:0.7rem; color:#66bb6a; font-family:'JetBrains Mono',monospace">-- / --
+                                GB</span>
+                        </div>
+                        <div style="background:#111; border-radius:4px; height:8px; overflow:hidden">
+                            <div id="sysMonRamBar"
+                                style="height:100%; width:0%; background:linear-gradient(90deg,#43a047,#66bb6a); border-radius:4px; transition:width 0.5s ease">
                             </div>
                         </div>
+                        <div style="text-align:right; font-size:0.65rem; color:#555; margin-top:2px"><span
+                                id="sysMonRamPct">0</span>%</div>
                     </div>
-                    <div class="ocr-results" id="ocrList" style="max-height:80px; overflow-y:auto; margin-bottom:8px">
-                        <div class="ocr-empty">Yazı algılanmadı</div>
+                    <!-- Disk -->
+                    <div style="margin-bottom:10px">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+                            <span style="font-size:0.75rem; color:#aaa; font-weight:600">💿 Disk</span>
+                            <span id="sysMonDiskText"
+                                style="font-size:0.7rem; color:#ffa726; font-family:'JetBrains Mono',monospace">-- / --
+                                GB</span>
+                        </div>
+                        <div style="background:#111; border-radius:4px; height:8px; overflow:hidden">
+                            <div id="sysMonDiskBar"
+                                style="height:100%; width:0%; background:linear-gradient(90deg,#ef6c00,#ffa726); border-radius:4px; transition:width 0.5s ease">
+                            </div>
+                        </div>
+                        <div style="text-align:right; font-size:0.65rem; color:#555; margin-top:2px"><span
+                                id="sysMonDiskPct">0</span>%</div>
                     </div>
-                    <div style="font-size:0.7rem; color:#666; font-weight:600; margin-bottom:4px">HATALAR</div>
-                    <div class="error-list" id="errorList" style="max-height:80px; overflow-y:auto">
-                        <div class="ocr-empty">Hata yok</div>
-                    </div>
+                    <div class="sep" style="margin:8px 0"></div>
+                    <!-- Sistem Detayları -->
+                    <div style="font-size:0.7rem; color:#666; font-weight:600; margin-bottom:6px">SİSTEM DETAYLARI</div>
+                    <div class="stg-row"><label>Hostname</label><span class="mono" id="sysMonHostname"
+                            style="color:var(--blue)">--</span></div>
+                    <div class="stg-row"><label>IP Adresi</label><span class="mono" id="sysMonIP"
+                            style="color:var(--green)">--</span></div>
+                    <div class="stg-row"><label>CPU Çekirdek</label><span class="mono" id="sysMonCores"
+                            style="color:#aaa">--</span></div>
+                    <div class="stg-row"><label>Python</label><span class="mono" id="sysMonPython"
+                            style="color:#ce93d8">--</span></div>
+                    <div class="stg-row"><label>Çalışma Süresi</label><span class="mono" id="sysMonUptime"
+                            style="color:#ffeb3b">--</span></div>
                 </div>
             </div>
 
@@ -950,6 +1018,12 @@
             </div>
 
         </div>
+        
+        <!-- SABİT KAYDET BUTONU -->
+        <button id="floatingSaveBtn" class="btn ripple" onclick="saveScenario()"
+            style="position:fixed; bottom:30px; right:30px; width:auto; max-width:max-content; z-index:9999; background:var(--blue); color:#fff; border:none; border-radius:50px; padding:10px 20px; font-weight:bold; font-size:0.9rem; box-shadow:0 6px 16px rgba(0,0,0,0.4); cursor:pointer; display:flex; align-items:center; gap:8px;">
+            💾 Kaydet
+        </button>
     </main>
 
     <!-- ══════ TAB: NOZZLE ══════ -->

@@ -1605,6 +1605,10 @@ class CameraManager:
             gray = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2GRAY)
             gray_rotated = cv2.rotate(gray, cv2.ROTATE_180)
 
+            if not getattr(self, 'auto_centering', False):
+                display = cv2.cvtColor(gray_rotated, cv2.COLOR_GRAY2BGR)
+                return gray_rotated, None, display
+
             # OCR için threshold
             blurred = cv2.GaussianBlur(gray_rotated, (5, 5), 0)
             thresh = cv2.adaptiveThreshold(
@@ -1773,7 +1777,7 @@ class CameraManager:
                 except Exception as e:
                     log.error(f"OCR API yeniden oluşturma hatası: {e}")
 
-            if self.current_thresh is not None:
+            if getattr(self, 'auto_centering', False) and self.current_thresh is not None:
                 t_start = time.time()
 
                 with self.frame_lock:
@@ -1865,6 +1869,10 @@ class CameraManager:
 
                 time.sleep(0.02) # OCR arası kısa dinlenme (~30 FPS maks)
             else:
+                if not getattr(self, 'auto_centering', False):
+                    with self.ocr_lock:
+                        self.ocr_results = []
+                        self.stable_boxes.clear()
                 time.sleep(0.05)
 
         api.End()
@@ -1890,7 +1898,7 @@ class CameraManager:
 
             # OCR thread'ine threshold ver (TAM ÇÖZÜNÜRLÜK)
             with self.frame_lock:
-                self.current_thresh = thresh.copy()
+                self.current_thresh = thresh.copy() if thresh is not None else None
                 self.current_gray = gray
 
             # ─── Display Frame Optimizasyonu (Resize) ─────────────
@@ -2072,7 +2080,10 @@ class CameraManager:
                 self.annotated_jpeg = jpeg_bytes
                 self.raw_jpeg_bytes = raw_bytes
 
-            time.sleep(0.001)
+            if getattr(self, 'auto_centering', False):
+                time.sleep(0.001)
+            else:
+                time.sleep(0.033)  # OCR kapalıyken 20 FPS sınırı
 
         log.info("Kamera worker durduruldu.")
 
@@ -2838,7 +2849,11 @@ def _run_sub_steps(steps, pnp_ref, camera_ref, socketio_ref, emit_fn, parent_lab
     Özyinelemeli IF blokları desteklenir.
     """
     global scenario_stop_flag
-    for si, step in enumerate(steps):
+    
+    si = 0
+    while si < len(steps):
+        step = steps[si]
+        
         if scenario_stop_flag:
             return False
 
@@ -3238,7 +3253,31 @@ def _run_sub_steps(steps, pnp_ref, camera_ref, socketio_ref, emit_fn, parent_lab
         else:
             emit_fn('warning', f"{label} Bilinmeyen komut: {stype}")
 
+        # ── OTONOM KURTARMA (Adım sonrası GRBL bağlantı kontrolü) ──
+        if pnp_ref.ser and not pnp_ref.ser.is_open:
+            emit_fn('error', f"{label} GRBL bağlantısı koptu! Otonom kurtarma başlatılıyor...")
+            log.error(f"GRBL bağlantı kaybı (Alt Adım) — otonom kurtarma başlıyor: {label}")
+            
+            # Otonom Home ve Reconnect
+            recovered = pnp_ref.reconnect_and_home_autonomous()
+            
+            if recovered:
+                emit_fn('running', f"{label} Otonom Kurtarma Başarılı! Adım tekrar deneniyor...")
+                # continue kullanarak si'yi ARTTIRMADAN döngünün başına dön
+                time.sleep(1)
+                continue
+            else:
+                try:
+                    pnp_ref.pump(False)
+                except Exception:
+                    pass
+                emit_fn('error', f"{label} Otonom Kurtarma BAŞARISIZ! Alt senaryo durduruldu.")
+                return False
+
         time.sleep(0.3)
+        
+        # Adım başarıyla tamamlandı, sonraki adıma geç
+        si += 1
 
     return True
 
@@ -3282,7 +3321,10 @@ def run_scenario(scenario, pnp_ref, camera_ref, socketio_ref):
         emit('started', f"Senaryo '{name}' başlatıldı ({len(steps)} adım)")
         log.info(f"Senaryo başlatıldı: {name} ({len(steps)} adım)")
 
-        for i, step in enumerate(steps):
+        i = 0
+        while i < len(steps):
+            step = steps[i]
+            
             if scenario_stop_flag:
                 emit('stopped', f"Senaryo durduruldu (adım {i+1}/{len(steps)}).")
                 log.info(f"Senaryo durduruldu: {name}")
@@ -3659,7 +3701,32 @@ def run_scenario(scenario, pnp_ref, camera_ref, socketio_ref):
             else:
                 emit('warning', f"Bilinmeyen komut tipi: {stype}", i)
 
+            # ── OTONOM KURTARMA (Adım sonrası GRBL bağlantı kontrolü) ──
+            if pnp_ref.ser and not pnp_ref.ser.is_open:
+                emit('error', f"GRBL bağlantısı koptu! Otonom kurtarma başlatılıyor (Adım {i+1})...", i)
+                log.error(f"GRBL bağlantı kaybı tespit edildi — otonom kurtarma başlıyor (adım {i+1})")
+                
+                # Otonom Home ve Reconnect
+                recovered = pnp_ref.reconnect_and_home_autonomous()
+                
+                if recovered:
+                    emit('running', f"Otonom Kurtarma Başarılı! Adım {i+1} tekrar deneniyor...", i)
+                    # continue kullanarak i'yi ARTTIRMADAN döngünün başına dön
+                    # Böylece kopmanın olduğu adım tekrar denenecek
+                    time.sleep(1)
+                    continue
+                else:
+                    try:
+                        pnp_ref.pump(False)  # Güvenlik: pompayı kapat
+                    except Exception:
+                        pass
+                    emit('error', "Otonom Kurtarma BAŞARISIZ! Senaryo güvenlik nedeniyle durduruldu. Cihazı kontrol edin.")
+                    return
+
             time.sleep(0.3)  # Adımlar arası kısa mola
+            
+            # Adım başarıyla tamamlandı, sonraki adıma geç
+            i += 1
 
         emit('done', f"Senaryo '{name}' tamamlandı ✓")
         log.info(f"Senaryo tamamlandı: {name}")
@@ -4136,6 +4203,54 @@ def api_uptime():
     })
 
 
+@app.route('/api/system_info')
+@login_required
+def api_system_info():
+    """Sistem kaynak kullanımını (CPU, RAM, Temp) ve özet bilgileri döndür."""
+    import psutil
+    import socket
+    import platform
+    
+    cpu_percent = psutil.cpu_percent(interval=None)
+    cpu_count = psutil.cpu_count(logical=True)
+    
+    cpu_temp = None
+    if hasattr(psutil, "sensors_temperatures"):
+        temps = psutil.sensors_temperatures()
+        if "cpu_thermal" in temps:
+            cpu_temp = round(temps["cpu_thermal"][0].current, 1)
+        elif "coretemp" in temps:
+            cpu_temp = round(temps["coretemp"][0].current, 1)
+    
+    if cpu_temp is None:
+        try:
+            with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+                cpu_temp = round(int(f.read()) / 1000.0, 1)
+        except Exception:
+            pass
+
+    mem = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
+    
+    uptime_sec = int(time.time() - SYSTEM_START_TIME)
+    
+    return jsonify({
+        'cpu_percent': cpu_percent,
+        'cpu_count': cpu_count,
+        'cpu_temp': cpu_temp,
+        'ram_percent': mem.percent,
+        'ram_used_gb': round(mem.used / (1024 ** 3), 1),
+        'ram_total_gb': round(mem.total / (1024 ** 3), 1),
+        'disk_percent': disk.percent,
+        'disk_used_gb': round(disk.used / (1024 ** 3), 1),
+        'disk_total_gb': round(disk.total / (1024 ** 3), 1),
+        'hostname': socket.gethostname(),
+        'ip_address': socket.gethostbyname(socket.gethostname()),
+        'python_version': platform.python_version(),
+        'uptime_formatted': f"{uptime_sec // 3600:02d}:{(uptime_sec % 3600) // 60:02d}:{uptime_sec % 60:02d}"
+    })
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 #  NOZZLE API ENDPOINT'LERİ
 # ═════════════════════════════════════════════════════════════════════════════
@@ -4338,6 +4453,7 @@ def handle_connect():
         'ocr_fps': round(camera.ocr_fps, 1),
         'ocr': ocr_data,
         'auto_centering': camera.auto_centering,
+        'ocr_enabled': getattr(camera, 'auto_centering', False),
     })
     # Nozzle durumunu da gönder
     socketio.emit('nozzle_status', nozzle.get_status())
@@ -4361,6 +4477,7 @@ def handle_status_request():
         'ocr_fps': round(camera.ocr_fps, 1),
         'ocr': ocr_data,
         'auto_centering': camera.auto_centering,
+        'ocr_enabled': getattr(camera, 'auto_centering', False),
     })
 
 
@@ -4383,6 +4500,7 @@ def periodic_status_emitter():
                 'ocr_fps': round(camera.ocr_fps, 1),
                 'ocr': ocr_data,
                 'auto_centering': camera.auto_centering,
+                'ocr_enabled': getattr(camera, 'auto_centering', False),
             })
         except Exception:
             pass
