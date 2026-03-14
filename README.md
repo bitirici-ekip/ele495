@@ -107,8 +107,3 @@ pip install -r requirements.txt
 python app.py
 ```
 *Sistem başlatıldıktan sonra varsayılan olarak `http://0.0.0.0:5000` portu üzerinden ağdaki tüm cihazların erişimine hazır hale gelecektir.*
-
----
-
-## 📜 Akademik Bildirim
-Bu proje bir lisans tez çalışması olup, akademik etik ve mühendislik standartları çerçevesinde baştan sona ekibimiz tarafından sıfırdan geliştirilmiştir. Tasarım süreci, kod mimarisi ve donanım entegrasyonu tamamen projeye özgündür. 
