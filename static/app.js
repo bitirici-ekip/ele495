@@ -164,8 +164,25 @@ function initSocket() {
         let isPassed = null; // null = belirsiz, true = PASS, false = FAIL
         let bannerTitle = '';
         let bannerDetail = '';
+        let colorOverride = null;
 
-        if (d.type === 'resistance') {
+        if (d.type === 'resistance_info') {
+            // ── DİRENÇ ÖLÇ (Kontrolsüz) — Yas Marina Blue banner ──
+            const box = $('qmResBox');
+            if (box) box.style.display = 'block';
+            const resVal = $('qmResValue');
+            if (resVal) {
+                resVal.textContent = d.measured_formatted || '--';
+                resVal.style.color = '#64B5F6';
+            }
+            const resDetail = $('qmResDetail');
+            if (resDetail) resDetail.textContent = 'Kontrolsüz Ölçüm';
+
+            bannerTitle = '🔬 DİRENÇ ÖLÇÜMÜ';
+            bannerDetail = d.measured_formatted || '?';
+            colorOverride = 'yasmarina';
+
+        } else if (d.type === 'resistance') {
             const box = $('qmResBox');
             if (box) box.style.display = 'block';
 
@@ -236,13 +253,13 @@ function initSocket() {
             }
         }
 
-        // Büyük PASS/FAIL banner'ını göster
-        showTestBanner(isPassed, bannerTitle, bannerDetail);
+        // Büyük banner'ı göster
+        showTestBanner(isPassed, bannerTitle, bannerDetail, colorOverride);
     });
 }
 
 let _testBannerTimer = null;
-function showTestBanner(isPassed, title, detail) {
+function showTestBanner(isPassed, title, detail, colorOverride) {
     const banner = $('scenarioTestBanner');
     if (!banner) return;
 
@@ -252,24 +269,47 @@ function showTestBanner(isPassed, title, detail) {
     const titleEl = $('scenarioTestBannerTitle');
     const detailEl = $('scenarioTestBannerDetail');
 
-    if (isPassed === true) {
+    if (colorOverride === 'yasmarina') {
+        // Yas Marina Blue — BMW B68 (#2536A7)
+        banner.style.background = 'linear-gradient(135deg, #1a2980, #2536A7)';
+        banner.style.border = '4px solid #5C6BC0';
+        banner.style.color = '#fff';
+        // Özel layout: Değer büyük, başlık küçük
+        if (iconEl) iconEl.textContent = '🔬';
+        if (titleEl) {
+            titleEl.textContent = title;
+            titleEl.style.fontSize = '1rem';
+            titleEl.style.opacity = '0.8';
+            titleEl.style.fontWeight = '600';
+        }
+        if (detailEl) {
+            detailEl.textContent = detail;
+            detailEl.style.fontSize = '3.5rem';
+            detailEl.style.fontWeight = '900';
+            detailEl.style.opacity = '1';
+            detailEl.style.letterSpacing = '2px';
+        }
+    } else if (isPassed === true) {
         banner.style.background = 'linear-gradient(135deg, #1b5e20, #2e7d32)';
         banner.style.border = '4px solid #4caf50';
         banner.style.color = '#fff';
         if (iconEl) iconEl.textContent = '✅';
-        if (titleEl) titleEl.textContent = 'PASS — ' + title;
+        if (titleEl) { titleEl.textContent = 'PASS — ' + title; titleEl.style.fontSize = ''; titleEl.style.opacity = ''; titleEl.style.fontWeight = ''; }
+        if (detailEl) { detailEl.style.fontSize = '1rem'; detailEl.style.fontWeight = '500'; detailEl.style.opacity = '0.85'; detailEl.style.letterSpacing = ''; }
     } else if (isPassed === false) {
         banner.style.background = 'linear-gradient(135deg, #b71c1c, #c62828)';
         banner.style.border = '4px solid #f44336';
         banner.style.color = '#fff';
         if (iconEl) iconEl.textContent = '❌';
-        if (titleEl) titleEl.textContent = 'FAIL — ' + title;
+        if (titleEl) { titleEl.textContent = 'FAIL — ' + title; titleEl.style.fontSize = ''; titleEl.style.opacity = ''; titleEl.style.fontWeight = ''; }
+        if (detailEl) { detailEl.style.fontSize = '1rem'; detailEl.style.fontWeight = '500'; detailEl.style.opacity = '0.85'; detailEl.style.letterSpacing = ''; }
     } else {
         banner.style.background = 'linear-gradient(135deg, #0d47a1, #1565c0)';
         banner.style.border = '4px solid #42a5f5';
         banner.style.color = '#fff';
         if (iconEl) iconEl.textContent = '📊';
-        if (titleEl) titleEl.textContent = title;
+        if (titleEl) { titleEl.textContent = title; titleEl.style.fontSize = ''; titleEl.style.opacity = ''; titleEl.style.fontWeight = ''; }
+        if (detailEl) { detailEl.style.fontSize = '1rem'; detailEl.style.fontWeight = '500'; detailEl.style.opacity = '0.85'; detailEl.style.letterSpacing = ''; }
     }
 
     if (detailEl) detailEl.textContent = detail;
@@ -744,7 +784,58 @@ function pollUptime() { fetch('/api/uptime').then(r => r.json()).then(d => { $('
 function pollSystemInfo() {
     fetch('/api/system_info').then(r => r.json()).then(d => updateSystemInfo(d)).catch(() => { });
 }
+
+let _sysChart = null;
+let _chartLabels = [];
+let _chartDataCpu = [];
+let _chartDataRam = [];
+const MAX_CHART_POINTS = 30;
+
 function updateSystemInfo(d) {
+    // ── CHART.JS GÜNCELLEMESİ ──
+    if (typeof Chart !== 'undefined' && $('sysChart')) {
+        if (!_sysChart) {
+            const ctx = $('sysChart').getContext('2d');
+            _sysChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: _chartLabels,
+                    datasets: [
+                        { label: 'CPU (%)', data: _chartDataCpu, borderColor: '#42a5f5', backgroundColor: 'rgba(66, 165, 245, 0.1)', borderWidth: 2, tension: 0.3, fill: true, pointRadius: 0 },
+                        { label: 'RAM (%)', data: _chartDataRam, borderColor: '#66bb6a', backgroundColor: 'rgba(102, 187, 106, 0.1)', borderWidth: 2, tension: 0.3, fill: true, pointRadius: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { display: false },
+                        y: { min: 0, max: 100, grid: { color: '#333' }, ticks: { color: '#888' } }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#eee', font: { family: 'JetBrains Mono' } } }
+                    }
+                }
+            });
+        }
+        
+        const now = new Date();
+        const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') + ':' + now.getSeconds().toString().padStart(2, '0');
+        
+        _chartLabels.push(timeStr);
+        _chartDataCpu.push(d.cpu_percent || 0);
+        _chartDataRam.push(d.ram_percent || 0);
+        
+        if (_chartLabels.length > MAX_CHART_POINTS) {
+            _chartLabels.shift();
+            _chartDataCpu.shift();
+            _chartDataRam.shift();
+        }
+        _sysChart.update();
+    }
+
     // Header güncelleme — Sıcaklık
     const tempStr = d.cpu_temp !== null ? d.cpu_temp + '°C' : 'N/A';
     const hTemp = $('headerCpuTemp');
@@ -809,17 +900,47 @@ function updateSystemInfo(d) {
     }
     const dPct = $('sysMonDiskPct');
     if (dPct) dPct.textContent = d.disk_percent;
-    // Sistem detayları
-    const sHost = $('sysMonHostname');
-    if (sHost) sHost.textContent = d.hostname || '--';
-    const sIP = $('sysMonIP');
-    if (sIP) sIP.textContent = d.ip_address || '--';
-    const sCores = $('sysMonCores');
-    if (sCores) sCores.textContent = d.cpu_count || '--';
-    const sPy = $('sysMonPython');
-    if (sPy) sPy.textContent = d.python_version || '--';
-    const sUp = $('sysMonUptime');
-    if (sUp) sUp.textContent = d.uptime_formatted || '--';
+
+    // Swap bar
+    const swText = $('sysMonSwapText');
+    if (swText) swText.textContent = d.swap_used_gb + ' / ' + d.swap_total_gb + ' GB';
+    const swBar = $('sysMonSwapBar');
+    if (swBar) swBar.style.width = d.swap_percent + '%';
+    const swPct = $('sysMonSwapPct');
+    if (swPct) swPct.textContent = d.swap_percent;
+
+    // ── Sağ Sütun: Detay Alanları ──
+    // Donanım & İşletim Sistemi
+    const el = (id, val) => { const e = $(id); if (e) e.textContent = val || '--'; };
+    el('sysMonHostname', d.hostname);
+    el('sysMonOS', d.os_info);
+    el('sysMonArch', d.arch);
+    el('sysMonPython', d.python_version);
+    el('sysMonCoresPhys', d.cpu_count_physical);
+    el('sysMonCores', d.cpu_count);
+    el('sysMonCpuFreq', d.cpu_freq_mhz ? d.cpu_freq_mhz + ' MHz' : '--');
+    el('sysMonBootTime', d.boot_time);
+    el('sysMonUptime', d.uptime_formatted);
+
+    // Ağ Bilgileri
+    el('sysMonIP', d.ip_address);
+    el('sysMonMAC', d.mac_address);
+    el('sysMonNetSent', d.net_sent);
+    el('sysMonNetRecv', d.net_recv);
+    el('sysMonNetPktSent', d.net_pkt_sent ? d.net_pkt_sent.toLocaleString() : '--');
+    el('sysMonNetPktRecv', d.net_pkt_recv ? d.net_pkt_recv.toLocaleString() : '--');
+    el('sysMonDiskRead', d.disk_read_mb + ' MB');
+    el('sysMonDiskWrite', d.disk_write_mb + ' MB');
+
+    // Sistem Yükü & İşlemler
+    el('sysMonLoadAvg', d.load_avg);
+    el('sysMonProcCount', d.proc_count);
+    el('sysMonThreads', d.thread_count);
+    el('sysMonFDs', d.fd_count);
+    el('sysMonRamTotal', d.ram_total_gb + ' GB');
+    el('sysMonRamUsed', d.ram_used_gb + ' GB');
+    el('sysMonRamFree', d.ram_free_gb + ' GB');
+    el('sysMonRamCached', d.ram_cached_mb + ' MB');
 }
 
 /* ═══ CONSOLE ═══ */
@@ -1379,6 +1500,7 @@ function _getSubStepOptions() {
         <option value="diode_test">💡 Diyot Testi</option>
         <option value="nozzle_goto">🔄 Nozzle Açıya Git</option>
         <option value="nozzle_home">🏠 Nozzle Home</option>
+        <option value="measure_resistance">🔬 Direnç Ölç (Kontrolsüz)</option>
     `;
 }
 
@@ -1397,7 +1519,7 @@ function _getSubStepParamHtml(prefix, branch) {
         return `<input type="number" class="cfg-in" id="${paramId}" placeholder="Z (mm)" value="-163" style="flex:1;font-size:0.75rem">`;
     } else if (type === 'nozzle_goto') {
         return `<input type="number" class="cfg-in" id="${paramId}" placeholder="Açı (0-180°)" value="0" min="0" max="180" style="flex:1;font-size:0.75rem">`;
-    } else if (type === 'resistance_test' || type === 'diode_test' || type === 'resistance_read' || type === 'diode_read') {
+    } else if (type === 'resistance_test' || type === 'diode_test' || type === 'resistance_read' || type === 'diode_read' || type === 'measure_resistance') {
         return `<span id="${paramId}" style="flex:1;font-size:0.7rem;color:#666;padding:4px">Parametre yok</span>`;
     }
     // pump_on, pump_off, home, nozzle_home, verify — no param needed
@@ -1610,7 +1732,7 @@ function onStepTypeChange() {
     } else if (type === 'nozzle_goto') {
         box.innerHTML = `<input type="number" class="cfg-in" id="stepNozzleAngle" placeholder="Açı (0-180°)" value="0" min="0" max="180">`;
         box.style.display = '';
-    } else if (type === 'resistance_test' || type === 'diode_test' || type === 'resistance_read' || type === 'diode_read') {
+    } else if (type === 'resistance_test' || type === 'diode_test' || type === 'resistance_read' || type === 'diode_read' || type === 'measure_resistance') {
         box.innerHTML = '';
         box.style.display = 'none';
     } else if (type === 'if_resistance') {
@@ -1693,7 +1815,7 @@ function addScenarioStep() {
         if (isNaN(a)) { showToast('Geçerli açı değeri girin!', 'error'); return; }
         a = Math.max(0, Math.min(180, a));
         step.angle = a;
-    } else if (type === 'resistance_test' || type === 'diode_test' || type === 'resistance_read' || type === 'diode_read') {
+    } else if (type === 'resistance_test' || type === 'diode_test' || type === 'resistance_read' || type === 'diode_read' || type === 'measure_resistance') {
         // removed test_count
     } else if (type === 'if_resistance') {
         const target = parseFloat($('stepIfResTarget')?.value) || 10000;
@@ -1760,7 +1882,7 @@ function editScenarioStep(idx) {
         } else if (step.type === 'nozzle_goto') {
             const inp = $('stepNozzleAngle');
             if (inp) inp.value = step.angle;
-        } else if (step.type === 'resistance_test' || step.type === 'diode_test' || step.type === 'resistance_read' || step.type === 'diode_read') {
+        } else if (step.type === 'resistance_test' || step.type === 'diode_test' || step.type === 'resistance_read' || step.type === 'diode_read' || step.type === 'measure_resistance') {
             // removed test_count
         } else if (step.type === 'if_resistance') {
             const t = $('stepIfResTarget'); if (t) t.value = step.target_resistance || 10000;
@@ -1868,6 +1990,7 @@ function stepLabel(step) {
     if (t === 'diode_test') return `💡 Diyot Testi`;
     if (t === 'nozzle_goto') return `🔄 Nozzle ${step.angle || 0}° açıya git`;
     if (t === 'nozzle_home') return '🏠 Nozzle Home';
+    if (t === 'measure_resistance') return `🔬 Direnç Ölç (Kontrolsüz)`;
     if (t === 'if_resistance') {
         const ps = (step.pass_steps || []).length;
         const fs = (step.fail_steps || []).length;
@@ -2244,6 +2367,26 @@ async function saveVerificationSettings() {
     _vConfig.threshold = parseInt($('vThreshold').value) || 127;
     _vConfig.display_threshold = parseInt($('vDisplayThreshold').value) || 5;
 
+    // ── Auto-Align (Template Matching) İçin İlk Kutuyu (Çıpa) Kaydet ──
+    if (_vConfig.boxes && _vConfig.boxes.length > 0) {
+        const img = $('vMainCam');
+        if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
+            const b0 = _vConfig.boxes[0];
+            const canvas = document.createElement('canvas');
+            const cw = Math.max(1, Math.floor(b0.w * img.naturalWidth));
+            const ch = Math.max(1, Math.floor(b0.h * img.naturalHeight));
+            canvas.width = cw;
+            canvas.height = ch;
+            const ctx = canvas.getContext('2d');
+            const cx = Math.floor(b0.x * img.naturalWidth);
+            const cy = Math.floor(b0.y * img.naturalHeight);
+            ctx.drawImage(img, cx, cy, cw, ch, 0, 0, cw, ch);
+            _vConfig.anchor_template = canvas.toDataURL('image/jpeg', 0.9);
+        }
+    } else {
+        _vConfig.anchor_template = null;
+    }
+
     const r = await api('/api/verification/settings', _vConfig, 'POST');
     if (r.success) {
         showToast('Doğrulama ayarları kaydedildi.', 'info');
@@ -2320,8 +2463,13 @@ function renderBoxOverlay() {
 
         // Label
         const lbl = document.createElement('div');
-        lbl.textContent = b.name;
-        lbl.style.cssText = 'position:absolute;top:-18px;left:-2px;background:var(--orange);color:#000;font-size:0.65rem;padding:1px 4px;font-weight:bold;white-space:nowrap';
+        if (i === 0) {
+            lbl.textContent = '🎯 [ÇIPA] ' + b.name;
+            lbl.style.cssText = 'position:absolute;top:-18px;left:-2px;background:#2536A7;color:#fff;font-size:0.65rem;padding:1px 4px;font-weight:bold;white-space:nowrap;border-radius:2px;';
+        } else {
+            lbl.textContent = b.name;
+            lbl.style.cssText = 'position:absolute;top:-18px;left:-2px;background:var(--orange);color:#000;font-size:0.65rem;padding:1px 4px;font-weight:bold;white-space:nowrap;border-radius:2px;';
+        }
         div.appendChild(lbl);
 
         // Resize handle

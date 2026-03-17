@@ -46,12 +46,13 @@
         </div>
         <div class="h-center">
             <button class="tab-btn active" data-tab="control" onclick="switchTab('control')">🎮 Kontrol</button>
-            <button class="tab-btn" data-tab="calibration" onclick="switchTab('calibration')">🔧 Kalibrasyon</button>
-            <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Ayarlar</button>
-            <button class="tab-btn" data-tab="bases" onclick="switchTab('bases')">📍 Konumlar</button>
             <button class="tab-btn" data-tab="scenarios" onclick="switchTab('scenarios')">🎬 Senaryolar</button>
+            <button class="tab-btn" data-tab="bases" onclick="switchTab('bases')">📍 Konumlar</button>
             <button class="tab-btn" data-tab="nozzle" onclick="switchTab('nozzle')">🔧 Nozzle</button>
             <button class="tab-btn" data-tab="verification" onclick="switchTab('verification')">👁️ Doğrulama</button>
+            <button class="tab-btn" data-tab="calibration" onclick="switchTab('calibration')">🔧 Kalibrasyon</button>
+            <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')">⚙️ Ayarlar</button>
+            <button class="tab-btn" data-tab="system" onclick="switchTab('system')">🖥️ Sistem</button>
         </div>
         <div class="h-right">
             <div class="badge ok" id="motorBadge"><span class="dot"></span><span id="motorBadgeTxt">Motor</span></div>
@@ -593,11 +594,168 @@
     </main>
 
     <!-- ══════ TAB: AYARLAR ══════ -->
+    <!-- ══════ TAB: SİSTEM ══════ -->
+    <main class="tab-content" id="tab-system">
+        <style>
+            .sys-dash { display: grid; grid-template-columns: 380px 1fr; gap: 16px; padding: 16px; }
+            @media(max-width:900px){ .sys-dash { grid-template-columns: 1fr; } }
+            .sys-card { background: #111; border: 1px solid #333; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+            .sys-card-h { background: #1a1a1a; padding: 8px 14px; border-bottom: 1px solid #333; font-weight: 700; font-size: 0.85rem; color: #eee; }
+            .sys-card-b { padding: 12px; flex: 1; }
+            .sys-mono { font-family: 'JetBrains Mono', monospace; }
+            .sys-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; font-size: 0.78rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
+            .sys-row label { color: #aaa; flex: 1; }
+            .sys-row .sys-v { color: #eee; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; text-align: right; }
+            .sys-sep { height: 1px; background: #333; margin: 8px 0; }
+            .sys-section { font-size: 0.65rem; color: #888; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin: 8px 0 4px; padding-bottom: 3px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+            .sys-right { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        </style>
+        <div class="sys-dash">
+            <!-- ══ SOL SÜTUN: GRAFİK + KAYNAK ══ -->
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <!-- CHART -->
+                <div class="sys-card">
+                    <div class="sys-card-h">📈 Performans Grafiği (30sn)</div>
+                    <div class="sys-card-b" style="position:relative; height:200px; padding:8px;">
+                        <canvas id="sysChart"></canvas>
+                    </div>
+                </div>
+                <!-- KAYNAK KULLANIMI -->
+                <div class="sys-card">
+                    <div class="sys-card-h">🖥️ Kaynak Kullanımı</div>
+                    <div class="sys-card-b">
+                        <div style="display:flex; gap:8px; margin-bottom:10px">
+                            <div style="flex:1; text-align:center; background:linear-gradient(135deg,#1a0a0a,#2a1515); border:1px solid rgba(244,67,54,0.2); border-radius:8px; padding:8px">
+                                <div style="font-size:0.6rem; color:#ef9a9a; font-weight:600; text-transform:uppercase; margin-bottom:3px">🌡️ CPU Sıcaklığı</div>
+                                <div id="sysMonTemp" class="sys-mono" style="font-size:1.2rem; font-weight:800; color:#ef5350;">--°C</div>
+                            </div>
+                            <div style="flex:1; text-align:center; background:linear-gradient(135deg,#0a0a1a,#151525); border:1px solid rgba(66,165,245,0.2); border-radius:8px; padding:8px">
+                                <div style="font-size:0.6rem; color:#90caf9; font-weight:600; text-transform:uppercase; margin-bottom:3px">⚡ CPU Kullanımı</div>
+                                <div id="sysMonCpu" class="sys-mono" style="font-size:1.2rem; font-weight:800; color:#42a5f5;">--%</div>
+                            </div>
+                        </div>
+                        <!-- RAM -->
+                        <div style="margin-bottom:8px">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px">
+                                <span style="font-size:0.7rem; color:#aaa; font-weight:600">💾 RAM</span>
+                                <span id="sysMonRamText" class="sys-mono" style="font-size:0.65rem; color:#66bb6a;">-- / -- GB</span>
+                            </div>
+                            <div style="background:#222; border-radius:4px; height:7px; overflow:hidden">
+                                <div id="sysMonRamBar" style="height:100%; width:0%; background:linear-gradient(90deg,#43a047,#66bb6a); border-radius:4px; transition:width 0.5s ease"></div>
+                            </div>
+                            <div style="text-align:right; font-size:0.6rem; color:#555; margin-top:2px"><span id="sysMonRamPct">0</span>%</div>
+                        </div>
+                        <!-- SWAP -->
+                        <div style="margin-bottom:8px">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px">
+                                <span style="font-size:0.7rem; color:#aaa; font-weight:600">🔄 Swap</span>
+                                <span id="sysMonSwapText" class="sys-mono" style="font-size:0.65rem; color:#ce93d8;">-- / -- GB</span>
+                            </div>
+                            <div style="background:#222; border-radius:4px; height:7px; overflow:hidden">
+                                <div id="sysMonSwapBar" style="height:100%; width:0%; background:linear-gradient(90deg,#7b1fa2,#ce93d8); border-radius:4px; transition:width 0.5s ease"></div>
+                            </div>
+                            <div style="text-align:right; font-size:0.6rem; color:#555; margin-top:2px"><span id="sysMonSwapPct">0</span>%</div>
+                        </div>
+                        <!-- DISK -->
+                        <div style="margin-bottom:6px">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px">
+                                <span style="font-size:0.7rem; color:#aaa; font-weight:600">💿 Disk</span>
+                                <span id="sysMonDiskText" class="sys-mono" style="font-size:0.65rem; color:#ffa726;">-- / -- GB</span>
+                            </div>
+                            <div style="background:#222; border-radius:4px; height:7px; overflow:hidden">
+                                <div id="sysMonDiskBar" style="height:100%; width:0%; background:linear-gradient(90deg,#ef6c00,#ffa726); border-radius:4px; transition:width 0.5s ease"></div>
+                            </div>
+                            <div style="text-align:right; font-size:0.6rem; color:#555; margin-top:2px"><span id="sysMonDiskPct">0</span>%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ SAĞ SÜTUN: DETAYLAR ══ -->
+            <div class="sys-right">
+                <!-- DONANIM / İŞLETİM SİSTEMİ -->
+                <div class="sys-card">
+                    <div class="sys-card-h">🔧 Donanım & İşletim Sistemi</div>
+                    <div class="sys-card-b">
+                        <div class="sys-section">İşletim Sistemi</div>
+                        <div class="sys-row"><label>Hostname</label><span class="sys-v" id="sysMonHostname">--</span></div>
+                        <div class="sys-row"><label>OS / Kernel</label><span class="sys-v" id="sysMonOS">--</span></div>
+                        <div class="sys-row"><label>Mimari</label><span class="sys-v" id="sysMonArch">--</span></div>
+                        <div class="sys-row"><label>Python</label><span class="sys-v" id="sysMonPython" style="color:#ce93d8">--</span></div>
+                        <div class="sys-section">İşlemci</div>
+                        <div class="sys-row"><label>CPU Çekirdek (Fiziksel)</label><span class="sys-v" id="sysMonCoresPhys">--</span></div>
+                        <div class="sys-row"><label>CPU Çekirdek (Mantıksal)</label><span class="sys-v" id="sysMonCores">--</span></div>
+                        <div class="sys-row"><label>CPU Frekans</label><span class="sys-v" id="sysMonCpuFreq">--</span></div>
+                        <div class="sys-section">Çalışma Süreleri</div>
+                        <div class="sys-row"><label>Sistem Boot</label><span class="sys-v" id="sysMonBootTime" style="color:#ffeb3b">--</span></div>
+                        <div class="sys-row"><label>Sistem Çalışma Süresi</label><span class="sys-v" id="sysMonUptime" style="color:#ffeb3b">--</span></div>
+                        <div class="sys-row"><label>Yazılım Çalışma Süresi</label><span class="sys-v" id="sysUptime" style="color:#66bb6a">--</span></div>
+                    </div>
+                </div>
+
+                <!-- AĞ BİLGİLERİ -->
+                <div class="sys-card">
+                    <div class="sys-card-h">🌐 Ağ Bilgileri & I/O</div>
+                    <div class="sys-card-b">
+                        <div class="sys-section">Bağlantı</div>
+                        <div class="sys-row"><label>IP Adresi</label><span class="sys-v" id="sysMonIP" style="color:var(--green)">--</span></div>
+                        <div class="sys-row"><label>MAC Adresi</label><span class="sys-v" id="sysMonMAC">--</span></div>
+                        <div class="sys-section">Ağ İstatistikleri</div>
+                        <div class="sys-row"><label>Gönderilen (TX)</label><span class="sys-v" id="sysMonNetSent" style="color:#42a5f5">--</span></div>
+                        <div class="sys-row"><label>Alınan (RX)</label><span class="sys-v" id="sysMonNetRecv" style="color:#66bb6a">--</span></div>
+                        <div class="sys-row"><label>Gönderilen Paket</label><span class="sys-v" id="sysMonNetPktSent">--</span></div>
+                        <div class="sys-row"><label>Alınan Paket</label><span class="sys-v" id="sysMonNetPktRecv">--</span></div>
+                        <div class="sys-section">Disk I/O</div>
+                        <div class="sys-row"><label>Disk Okunma</label><span class="sys-v" id="sysMonDiskRead" style="color:#42a5f5">--</span></div>
+                        <div class="sys-row"><label>Disk Yazma</label><span class="sys-v" id="sysMonDiskWrite" style="color:#ffa726">--</span></div>
+                    </div>
+                </div>
+
+                <!-- SİSTEM YÜKÜ & İŞLEMLER -->
+                <div class="sys-card">
+                    <div class="sys-card-h">📊 Sistem Yükü & İşlemler</div>
+                    <div class="sys-card-b">
+                        <div class="sys-section">Load Average</div>
+                        <div class="sys-row"><label>1dk / 5dk / 15dk</label><span class="sys-v" id="sysMonLoadAvg">-- / -- / --</span></div>
+                        <div class="sys-section">İşlemler</div>
+                        <div class="sys-row"><label>Toplam İşlem</label><span class="sys-v" id="sysMonProcCount">--</span></div>
+                        <div class="sys-row"><label>Python Thread Sayısı</label><span class="sys-v" id="sysMonThreads">--</span></div>
+                        <div class="sys-row"><label>Açık Dosya Tanımlayıcı</label><span class="sys-v" id="sysMonFDs">--</span></div>
+                        <div class="sys-section">Bellek Detayları</div>
+                        <div class="sys-row"><label>Toplam RAM</label><span class="sys-v" id="sysMonRamTotal">--</span></div>
+                        <div class="sys-row"><label>Kullanılan RAM</label><span class="sys-v" id="sysMonRamUsed">--</span></div>
+                        <div class="sys-row"><label>Boş RAM</label><span class="sys-v" id="sysMonRamFree">--</span></div>
+                        <div class="sys-row"><label>Cached</label><span class="sys-v" id="sysMonRamCached">--</span></div>
+                    </div>
+                </div>
+
+                <!-- PORT & BAĞLANTI DURUMU -->
+                <div class="sys-card">
+                    <div class="sys-card-h">🔌 Port & Bağlantı Durumu</div>
+                    <div class="sys-card-b">
+                        <div class="sys-section">Seri Portlar</div>
+                        <div class="sys-row"><label>GRBL Motor Port</label><span class="sys-v" id="sysPort" style="color:var(--blue)">--</span></div>
+                        <div class="sys-row"><label>GRBL Durum</label><span class="sys-v" id="sysMotor">--</span></div>
+                        <div class="sys-row"><label>GRBL State</label><span class="sys-v" id="sysGrbl">--</span></div>
+                        <div class="sys-row"><label>Nozzle Arduino Port</label><span class="sys-v" id="sysNozzlePort">--</span></div>
+                        <div class="sys-row"><label>Nozzle Durumu</label><span class="sys-v" id="sysNozzleStatus">--</span></div>
+                        <div class="sys-section">Kamera</div>
+                        <div class="sys-row"><label>Kamera Durumu</label><span class="sys-v" id="sysCam">--</span></div>
+                        <div class="sys-row"><label>Çözünürlük</label><span class="sys-v" id="sysCamRes">--</span></div>
+                        <div class="sys-row"><label>FPS</label><span class="sys-v" id="sysCamFps">--</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    </main>
+
+    <!-- ══════ TAB: AYARLAR ══════ -->
     <main class="tab-content" id="tab-settings">
         <style>
             .stg-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+                grid-template-columns: repeat(3, 1fr);
                 gap: 16px;
                 padding: 20px
             }
@@ -737,102 +895,26 @@
                 </div>
             </div>
 
-            <!-- SİSTEM MONİTÖRÜ -->
+            <!-- NOZZLE & TEST PARAMETRELERİ -->
             <div class="card">
                 <div class="card-h">
-                    <span class="card-t">🖥️ Sistem Monitörü</span>
+                    <span class="card-t">🔧 Nozzle & Test Parametreleri</span>
                 </div>
                 <div class="card-b" style="padding:12px">
-                    <!-- CPU Sıcaklığı -->
-                    <div style="display:flex; gap:12px; margin-bottom:12px">
-                        <div
-                            style="flex:1; text-align:center; background:linear-gradient(135deg,#1a0a0a,#2a1515); border:1px solid rgba(244,67,54,0.2); border-radius:8px; padding:10px">
-                            <div
-                                style="font-size:0.65rem; color:#ef9a9a; font-weight:600; text-transform:uppercase; margin-bottom:4px">
-                                🌡️ CPU Sıcaklığı</div>
-                            <div id="sysMonTemp"
-                                style="font-size:1.4rem; font-weight:800; color:#ef5350; font-family:'JetBrains Mono',monospace">
-                                --°C</div>
-                        </div>
-                        <div
-                            style="flex:1; text-align:center; background:linear-gradient(135deg,#0a0a1a,#151525); border:1px solid rgba(66,165,245,0.2); border-radius:8px; padding:10px">
-                            <div
-                                style="font-size:0.65rem; color:#90caf9; font-weight:600; text-transform:uppercase; margin-bottom:4px">
-                                ⚡ CPU Kullanımı</div>
-                            <div id="sysMonCpu"
-                                style="font-size:1.4rem; font-weight:800; color:#42a5f5; font-family:'JetBrains Mono',monospace">
-                                --%</div>
-                        </div>
-                    </div>
-                    <!-- RAM -->
-                    <div style="margin-bottom:10px">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
-                            <span style="font-size:0.75rem; color:#aaa; font-weight:600">💾 RAM</span>
-                            <span id="sysMonRamText"
-                                style="font-size:0.7rem; color:#66bb6a; font-family:'JetBrains Mono',monospace">-- / --
-                                GB</span>
-                        </div>
-                        <div style="background:#111; border-radius:4px; height:8px; overflow:hidden">
-                            <div id="sysMonRamBar"
-                                style="height:100%; width:0%; background:linear-gradient(90deg,#43a047,#66bb6a); border-radius:4px; transition:width 0.5s ease">
-                            </div>
-                        </div>
-                        <div style="text-align:right; font-size:0.65rem; color:#555; margin-top:2px"><span
-                                id="sysMonRamPct">0</span>%</div>
-                    </div>
-                    <!-- Disk -->
-                    <div style="margin-bottom:10px">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
-                            <span style="font-size:0.75rem; color:#aaa; font-weight:600">💿 Disk</span>
-                            <span id="sysMonDiskText"
-                                style="font-size:0.7rem; color:#ffa726; font-family:'JetBrains Mono',monospace">-- / --
-                                GB</span>
-                        </div>
-                        <div style="background:#111; border-radius:4px; height:8px; overflow:hidden">
-                            <div id="sysMonDiskBar"
-                                style="height:100%; width:0%; background:linear-gradient(90deg,#ef6c00,#ffa726); border-radius:4px; transition:width 0.5s ease">
-                            </div>
-                        </div>
-                        <div style="text-align:right; font-size:0.65rem; color:#555; margin-top:2px"><span
-                                id="sysMonDiskPct">0</span>%</div>
-                    </div>
-                    <div class="sep" style="margin:8px 0"></div>
-                    <!-- Sistem Detayları -->
-                    <div style="font-size:0.7rem; color:#666; font-weight:600; margin-bottom:6px">SİSTEM DETAYLARI</div>
-                    <div class="stg-row"><label>Hostname</label><span class="mono" id="sysMonHostname"
-                            style="color:var(--blue)">--</span></div>
-                    <div class="stg-row"><label>IP Adresi</label><span class="mono" id="sysMonIP"
-                            style="color:var(--green)">--</span></div>
-                    <div class="stg-row"><label>CPU Çekirdek</label><span class="mono" id="sysMonCores"
-                            style="color:#aaa">--</span></div>
-                    <div class="stg-row"><label>Python</label><span class="mono" id="sysMonPython"
-                            style="color:#ce93d8">--</span></div>
-                    <div class="stg-row"><label>Çalışma Süresi</label><span class="mono" id="sysMonUptime"
-                            style="color:#ffeb3b">--</span></div>
-                </div>
-            </div>
-
-            <!-- SİSTEM BİLGİSİ -->
-            <div class="card">
-                <div class="card-h"><span class="card-t">ℹ️ Sistem</span></div>
-                <div class="card-b" style="padding:12px">
-                    <div class="stg-row"><label>Motor Port</label><span class="mono" id="sysPort"
-                            style="color:var(--blue)">--</span></div>
-                    <div class="stg-row"><label>Motor Durum</label><span class="mono" id="sysMotor">--</span></div>
-                    <div class="stg-row"><label>Kamera</label><span class="mono" id="sysCam">--</span></div>
-                    <div class="stg-row"><label>GRBL State</label><span class="mono" id="sysGrbl">--</span></div>
-                    <div class="stg-row"><label>Çalışma Süresi</label><span class="mono" id="sysUptime">--</span></div>
-                    <div class="sep" style="margin:8px 0"></div>
-                    <div style="font-size:0.7rem; color:#666; font-weight:600; margin-bottom:4px">KISAYOLLAR</div>
-                    <div style="display:flex; gap:6px; flex-wrap:wrap">
-                        <span style="background:#222; padding:3px 8px; border-radius:4px; font-size:0.75rem">⬆⬇⬅➡
-                            Motor</span>
-                        <span style="background:#222; padding:3px 8px; border-radius:4px; font-size:0.75rem">H
-                            Home</span>
-                        <span style="background:#222; padding:3px 8px; border-radius:4px; font-size:0.75rem">C
-                            Center</span>
-                        <span style="background:#222; padding:3px 8px; border-radius:4px; font-size:0.75rem">E
-                            Kapat</span>
+                    <div class="stg-section">Direnç Ölçüm</div>
+                    <div class="stg-row"><label>Bilinen Direnç (Ω)</label><input type="number" id="cfgKnownRes" value="10000" min="100" step="100" style="width:90px"></div>
+                    <div class="stg-row"><label>ADC Eşik Değeri</label><input type="number" id="cfgAdcThreshold" value="50" min="1" max="1023" style="width:70px"></div>
+                    <div class="stg-row"><label>Çoklu Ölçüm Sayısı</label><input type="number" id="cfgTestCount" value="3" min="1" max="10" style="width:60px"></div>
+                    <div class="stg-row"><label>Ölçüm Aralığı (sn)</label><input type="number" id="cfgTestInterval" value="0.5" min="0" max="5" step="0.1" style="width:70px"></div>
+                    <div class="stg-section" style="margin-top:10px">Nozzle Servo</div>
+                    <div class="stg-row"><label>Min Açı</label><input type="number" id="cfgNozzleMin" value="0" min="0" max="90" style="width:60px">°</div>
+                    <div class="stg-row"><label>Max Açı</label><input type="number" id="cfgNozzleMax" value="180" min="90" max="180" style="width:60px">°</div>
+                    <div class="stg-row"><label>Home Hızı (µs)</label><input type="number" id="cfgNozzleHomeSpeed" value="2000" min="500" max="5000" step="100" style="width:80px"></div>
+                    <div class="stg-section" style="margin-top:10px">Diyot Test</div>
+                    <div class="stg-row"><label>Akım Eşiği (ADC)</label><input type="number" id="cfgDiodeThreshold" value="100" min="1" max="1023" style="width:70px"></div>
+                    <div class="stg-row"><label>Test Gecikmesi (ms)</label><input type="number" id="cfgDiodeDelay" value="200" min="50" max="2000" step="50" style="width:70px"></div>
+                    <div class="stg-save-row">
+                        <button class="btn btn-p ripple" style="padding:6px 20px; font-size:0.82rem" onclick="showToast('Nozzle ayarları kaydedildi.', 'info')">💾 Kaydet</button>
                     </div>
                 </div>
             </div>
@@ -928,6 +1010,7 @@
                                     <option value="diode_test">💡 Diyot Testi</option>
                                     <option value="nozzle_goto">🔄 Nozzle Açıya Git</option>
                                     <option value="nozzle_home">🏠 Nozzle Home</option>
+                                    <option value="measure_resistance">🔬 Direnç Ölç (Kontrolsüz)</option>
                                     <option value="if_resistance">🔬 IF Direnç Koşulu</option>
                                     <option value="if_diode">💡 IF Diyot Koşulu</option>
 

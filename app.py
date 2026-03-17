@@ -854,6 +854,21 @@ class PNPDriver:
                 self._busy = False
         return True
 
+    def wait_for_idle(self, timeout=30):
+        """Makinenin hareketini bitirmesini (Idle duruma geçmesini) bekler."""
+        if not self.connected or not self.ser:
+            return True
+        start = time.time()
+        # Komutun islenmesi icin kisa bekleme
+        time.sleep(0.5)
+        while time.time() - start < timeout:
+            status = self.query_grbl_status()
+            if status.get("state") == "Idle":
+                return True
+            time.sleep(0.2)
+        log.warning("PNPDriver: wait_for_idle timeout!")
+        return False
+
     def home(self):
         """Home komutu ($H) — tüm eksenleri referans noktasına taşır. ATOMİK."""
         log.info("Home başlatılıyor ($H)...")
@@ -2396,10 +2411,14 @@ def run_verification(camera_ref, pnp_ref, socketio_ref):
                 target_z = target['z']
                 if target_z < current_z:
                     pnp_ref.move_absolute(x=target['x'], y=target['y'])
+                    pnp_ref.wait_for_idle()
                     pnp_ref.move_absolute(z=target_z)
+                    pnp_ref.wait_for_idle()
                 else:
                     pnp_ref.move_absolute(z=target_z)
+                    pnp_ref.wait_for_idle()
                     pnp_ref.move_absolute(x=target['x'], y=target['y'])
+                    pnp_ref.wait_for_idle()
                 time.sleep(1.0)
             else:
                 emit('warning', f"Doğrulama konumu '{base_name}' bulunamadı. Mevcut konumda devam ediliyor.")
@@ -2430,12 +2449,65 @@ def run_verification(camera_ref, pnp_ref, socketio_ref):
         full_b64 = base64.b64encode(buf_full).decode('utf-8')
         emit('threshold_frame', "Threshold görüntüsü hazır.", data={'image': full_b64})
 
+        # ─── AUTO-ALIGN (TEMPLATE MATCHING) ───
+        dx = 0
+        dy = 0
+        anchor_b64 = v_config.get('anchor_template')
+        if anchor_b64 and len(boxes) > 0:
+            emit('running', "Hizalama (Auto-Align) hesaplanıyor...")
+            try:
+                header, encoded = anchor_b64.split(",", 1) if "," in anchor_b64 else ("", anchor_b64)
+                np_arr = np.frombuffer(base64.b64decode(encoded), np.uint8)
+                template_img = cv2.imdecode(np_arr, cv2.IMREAD_GRAYSCALE)
+                
+                if template_img is not None:
+                    # Orijinal anchor ROI referans noktası
+                    b0 = boxes[0]
+                    bx = int(b0.get('x', 0) * w_full)
+                    by = int(b0.get('y', 0) * h_full)
+                    bw = int(b0.get('w', 0.1) * w_full)
+                    bh = int(b0.get('h', 0.1) * h_full)
+                    
+                    search_margin = 80 # ±80 pixel arama alanı (~2-3 mm fiziki tolerans)
+                    sx1 = max(0, bx - search_margin)
+                    sy1 = max(0, by - search_margin)
+                    sx2 = min(w_full, bx + bw + search_margin)
+                    sy2 = min(h_full, by + bh + search_margin)
+                    
+                    search_gray = frame_gray[sy1:sy2, sx1:sx2]
+                    
+                    # Şablon boyutları arama alanından büyük / eşitse crash olmasını engelle
+                    th, tw = template_img.shape[:2]
+                    sh, sw = search_gray.shape[:2]
+                    if tw <= sw and th <= sh:
+                        res = cv2.matchTemplate(search_gray, template_img, cv2.TM_CCOEFF_NORMED)
+                        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+                        
+                        found_x = max_loc[0] + sx1
+                        found_y = max_loc[1] + sy1
+                        
+                        dx = found_x - bx
+                        dy = found_y - by
+                        
+                        if max_val > 0.6: # Güvenilir eşleşme
+                            emit('info', f"Auto-Align: Kayma düzeltildi (dx:{dx}px, dy:{dy}px) | Eşleşme: %{max_val*100:.1f}")
+                            log.info(f"Verification Auto-Align başarıyla uygulandı: dx={dx}, dy={dy}, val={max_val:.2f}")
+                        else:
+                            dx = 0
+                            dy = 0
+                            emit('warning', f"Auto-Align: Düşük güvenilirlik (%{max_val*100:.1f}), orijinal konumlar kullanılacak.")
+                    else:
+                        emit('warning', "Auto-Align: Arama alanı şablondan küçük, atlandı.")
+            except Exception as e:
+                log.error(f"Auto-Align hatası: {e}")
+                emit('warning', f"Auto-Align hatası: {e}. Orijinal konumlar kullanılacak.")
+
         # 3. ROI'leri analiz et
         img_h, img_w = thresh.shape[:2]
 
         for i, box in enumerate(boxes):
-            bx = int(box.get('x', 0) * img_w)
-            by = int(box.get('y', 0) * img_h)
+            bx = int(box.get('x', 0) * img_w) + dx
+            by = int(box.get('y', 0) * img_h) + dy
             bw = int(box.get('w', 0.1) * img_w)
             bh = int(box.get('h', 0.1) * img_h)
             name = box.get('name', 'Bilinmeyen')
@@ -3496,6 +3568,29 @@ def run_scenario(scenario, pnp_ref, camera_ref, socketio_ref):
                     emit('running', f"🏠 Nozzle: {msg}", i)
                     socketio_ref.emit('nozzle_status', nozzle.get_status())
 
+            # ── DİRENÇ ÖLÇ (Kontrolsüz - Tıpkı IF gibi popup çıkarır) ──────
+            elif stype == 'measure_resistance':
+                emit('running', "🔬 Direnç Ölçülüyor (Kontrolsüz)...", i)
+                if not nozzle.connected:
+                    emit('warning', "Nozzle bağlı değil! Ölçüm atlandı.", i)
+                else:
+                    test_count = 1
+                    result = nozzle.resistance_test_multi(
+                        count=test_count,
+                        interval=0.0,
+                        socketio_ref=socketio_ref
+                    )
+                    avg_ohm = result.get('average', 0)
+                    avg_str = result.get('average_formatted', '?')
+                    
+                    emit('running', f"🔬 Ölçülen Direnç: {avg_str}", i)
+                    
+                    socketio_ref.emit('scenario_test_result', {
+                        'type': 'resistance_info',
+                        'measured': avg_ohm,
+                        'measured_formatted': avg_str
+                    })
+
             # ── IF RESISTANCE (ana senaryo) ────────────────────────────────
             elif stype == 'if_resistance':
                 target_r = float(step.get('target_resistance', 10000))
@@ -3762,6 +3857,7 @@ def _step_description(step):
         return f"💡 IF Diyot: beklenen={exp} → [{len(step.get('pass_steps', []))} pass / {len(step.get('fail_steps', []))} fail adım]"
     if t == 'pick_and_test':
         return f"🤖 Al-Test-Yerleştir: {step.get('component_word', '?')} ({step.get('test_type', 'resistance')}) → PASS:{step.get('pass_place_base', '?')} / FAIL:{step.get('fail_place_base', '?')}"
+    if t == 'measure_resistance': return "🔬 Direnç Ölç (Kontrolsüz)"
     return f"❓ {t}"
 
 
@@ -4206,14 +4302,17 @@ def api_uptime():
 @app.route('/api/system_info')
 @login_required
 def api_system_info():
-    """Sistem kaynak kullanımını (CPU, RAM, Temp) ve özet bilgileri döndür."""
+    """Sistem kaynak kullanımını ve kapsamlı donanım bilgilerini döndür."""
     import psutil
     import socket
     import platform
-    
+    import os
+    import threading
+
     cpu_percent = psutil.cpu_percent(interval=None)
-    cpu_count = psutil.cpu_count(logical=True)
-    
+    cpu_count_logical = psutil.cpu_count(logical=True)
+    cpu_count_physical = psutil.cpu_count(logical=False)
+
     cpu_temp = None
     if hasattr(psutil, "sensors_temperatures"):
         temps = psutil.sensors_temperatures()
@@ -4221,7 +4320,7 @@ def api_system_info():
             cpu_temp = round(temps["cpu_thermal"][0].current, 1)
         elif "coretemp" in temps:
             cpu_temp = round(temps["coretemp"][0].current, 1)
-    
+
     if cpu_temp is None:
         try:
             with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
@@ -4229,21 +4328,117 @@ def api_system_info():
         except Exception:
             pass
 
+    # CPU Frequency
+    cpu_freq_mhz = None
+    try:
+        freq = psutil.cpu_freq()
+        if freq:
+            cpu_freq_mhz = round(freq.current)
+    except Exception:
+        pass
+
     mem = psutil.virtual_memory()
     disk = psutil.disk_usage('/')
-    
+
+    # Swap
+    swap = psutil.swap_memory()
+
+    # Network I/O
+    net = psutil.net_io_counters()
+
+    # Disk I/O
+    try:
+        dio = psutil.disk_io_counters()
+        disk_read_mb = round(dio.read_bytes / (1024 ** 2), 1) if dio else 0
+        disk_write_mb = round(dio.write_bytes / (1024 ** 2), 1) if dio else 0
+    except Exception:
+        disk_read_mb = 0
+        disk_write_mb = 0
+
+    # Load average
+    try:
+        la = os.getloadavg()
+        load_avg = f"{la[0]:.2f} / {la[1]:.2f} / {la[2]:.2f}"
+    except Exception:
+        load_avg = "N/A"
+
+    # Processes & threads
+    proc_count = len(psutil.pids())
+    thread_count = threading.active_count()
+    try:
+        fd_count = len(os.listdir(f'/proc/{os.getpid()}/fd'))
+    except Exception:
+        fd_count = 0
+
+    # Boot time
+    try:
+        bt = psutil.boot_time()
+        boot_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(bt))
+    except Exception:
+        boot_str = '--'
+
+    # OS info
+    os_info = f"{platform.system()} {platform.release()}"
+    arch = platform.machine()
+
+    # MAC address
+    mac_addr = '--'
+    try:
+        addrs = psutil.net_if_addrs()
+        for iface, addrlist in addrs.items():
+            if iface == 'lo':
+                continue
+            for a in addrlist:
+                if a.family == psutil.AF_LINK:
+                    mac_addr = a.address
+                    break
+            if mac_addr != '--':
+                break
+    except Exception:
+        pass
+
     uptime_sec = int(time.time() - SYSTEM_START_TIME)
-    
+
+    def fmt_bytes(b):
+        if b >= 1024 ** 3:
+            return f"{b / (1024 ** 3):.1f} GB"
+        elif b >= 1024 ** 2:
+            return f"{b / (1024 ** 2):.1f} MB"
+        elif b >= 1024:
+            return f"{b / 1024:.1f} KB"
+        return f"{b} B"
+
     return jsonify({
         'cpu_percent': cpu_percent,
-        'cpu_count': cpu_count,
+        'cpu_count': cpu_count_logical,
+        'cpu_count_physical': cpu_count_physical,
         'cpu_temp': cpu_temp,
+        'cpu_freq_mhz': cpu_freq_mhz,
         'ram_percent': mem.percent,
-        'ram_used_gb': round(mem.used / (1024 ** 3), 1),
-        'ram_total_gb': round(mem.total / (1024 ** 3), 1),
+        'ram_used_gb': round(mem.used / (1024 ** 3), 2),
+        'ram_total_gb': round(mem.total / (1024 ** 3), 2),
+        'ram_free_gb': round(mem.available / (1024 ** 3), 2),
+        'ram_cached_mb': round(getattr(mem, 'cached', 0) / (1024 ** 2)),
         'disk_percent': disk.percent,
         'disk_used_gb': round(disk.used / (1024 ** 3), 1),
         'disk_total_gb': round(disk.total / (1024 ** 3), 1),
+        'swap_percent': swap.percent,
+        'swap_used_gb': round(swap.used / (1024 ** 3), 2),
+        'swap_total_gb': round(swap.total / (1024 ** 3), 2),
+        'net_sent': fmt_bytes(net.bytes_sent),
+        'net_recv': fmt_bytes(net.bytes_recv),
+        'net_pkt_sent': net.packets_sent,
+        'net_pkt_recv': net.packets_recv,
+        'disk_read_mb': disk_read_mb,
+        'disk_write_mb': disk_write_mb,
+        'load_avg': load_avg,
+        'proc_count': proc_count,
+        'thread_count': thread_count,
+        'fd_count': fd_count,
+        'boot_time': boot_str,
+        'os_info': os_info,
+        'arch': arch,
+        'mac_address': mac_addr,
         'hostname': socket.gethostname(),
         'ip_address': socket.gethostbyname(socket.gethostname()),
         'python_version': platform.python_version(),

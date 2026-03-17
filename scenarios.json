@@ -31,8 +31,8 @@
         "z": -174
       },
       {
-        "seconds": 16,
-        "type": "delay"
+        "type": "delay",
+        "seconds": 17
       },
       {
         "type": "pump_on"
@@ -92,7 +92,7 @@
           },
           {
             "type": "move_z",
-            "z": -179.5
+            "z": -179.2
           },
           {
             "seconds": 3,
@@ -152,7 +152,7 @@
           },
           {
             "type": "move_z",
-            "z": -179.5
+            "z": -179.2
           },
           {
             "seconds": 3,
@@ -227,7 +227,7 @@
         "z": -174.1
       },
       {
-        "seconds": 16,
+        "seconds": 17,
         "type": "delay"
       },
       {
@@ -255,7 +255,7 @@
       },
       {
         "type": "move_z",
-        "z": -173.3
+        "z": -173.1
       },
       {
         "seconds": 5,
@@ -493,8 +493,8 @@
         "type": "if_diode"
       },
       {
-        "base_name": "D2 PCB",
-        "type": "goto_base"
+        "type": "goto_base",
+        "base_name": "D1 PCB"
       },
       {
         "seconds": 10,
@@ -580,8 +580,8 @@
         "z": -176
       },
       {
-        "seconds": 16,
-        "type": "delay"
+        "type": "delay",
+        "seconds": 18
       },
       {
         "type": "pump_on"
@@ -650,7 +650,7 @@
         "type": "if_diode"
       },
       {
-        "base_name": "D1 PCB",
+        "base_name": "D2 PCB",
         "type": "goto_base"
       },
       {
@@ -659,7 +659,7 @@
       },
       {
         "type": "move_z",
-        "z": -176
+        "z": -176.2
       },
       {
         "seconds": 7,
@@ -754,6 +754,120 @@
       },
       {
         "type": "pump_off"
+      }
+    ]
+  },
+  {
+    "name": "Test Direnç",
+    "steps": [
+      {
+        "base_name": "KOMPONENT BASE",
+        "type": "goto_base"
+      },
+      {
+        "seconds": 7,
+        "type": "delay"
+      },
+      {
+        "type": "auto_center",
+        "word": "CRB"
+      },
+      {
+        "seconds": 7,
+        "type": "delay"
+      },
+      {
+        "base_name": "CRB MERKEZ",
+        "type": "goto_base"
+      },
+      {
+        "seconds": 3,
+        "type": "delay"
+      },
+      {
+        "type": "move_z",
+        "z": -174
+      },
+      {
+        "type": "delay",
+        "seconds": 17
+      },
+      {
+        "type": "pump_on"
+      },
+      {
+        "seconds": 5,
+        "type": "delay"
+      },
+      {
+        "type": "move_z",
+        "z": -150
+      },
+      {
+        "seconds": 7,
+        "type": "delay"
+      },
+      {
+        "base_name": "DIRENC TEST",
+        "type": "goto_base"
+      },
+      {
+        "seconds": 5,
+        "type": "delay"
+      },
+      {
+        "type": "move_z",
+        "z": -173.3
+      },
+      {
+        "seconds": 5,
+        "type": "delay"
+      },
+      {
+        "type": "measure_resistance"
+      },
+      {
+        "seconds": 10,
+        "type": "delay"
+      },
+      {
+        "type": "move_z",
+        "z": -150
+      },
+      {
+        "seconds": 5,
+        "type": "delay"
+      },
+      {
+        "base_name": "BONUS MERKEZ",
+        "type": "goto_base"
+      },
+      {
+        "seconds": 5,
+        "type": "delay"
+      },
+      {
+        "type": "move_z",
+        "z": -173
+      },
+      {
+        "seconds": 5,
+        "type": "delay"
+      },
+      {
+        "type": "pump_off"
+      },
+      {
+        "seconds": 5,
+        "type": "delay"
+      },
+      {
+        "type": "move_z",
+        "z": -150
+      },
+      {
+        "seconds": 5,
+        "type": "delay"
       }
     ]
   }
