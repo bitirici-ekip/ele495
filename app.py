@@ -2449,65 +2449,12 @@ def run_verification(camera_ref, pnp_ref, socketio_ref):
         full_b64 = base64.b64encode(buf_full).decode('utf-8')
         emit('threshold_frame', "Threshold görüntüsü hazır.", data={'image': full_b64})
 
-        # ─── AUTO-ALIGN (TEMPLATE MATCHING) ───
-        dx = 0
-        dy = 0
-        anchor_b64 = v_config.get('anchor_template')
-        if anchor_b64 and len(boxes) > 0:
-            emit('running', "Hizalama (Auto-Align) hesaplanıyor...")
-            try:
-                header, encoded = anchor_b64.split(",", 1) if "," in anchor_b64 else ("", anchor_b64)
-                np_arr = np.frombuffer(base64.b64decode(encoded), np.uint8)
-                template_img = cv2.imdecode(np_arr, cv2.IMREAD_GRAYSCALE)
-                
-                if template_img is not None:
-                    # Orijinal anchor ROI referans noktası
-                    b0 = boxes[0]
-                    bx = int(b0.get('x', 0) * w_full)
-                    by = int(b0.get('y', 0) * h_full)
-                    bw = int(b0.get('w', 0.1) * w_full)
-                    bh = int(b0.get('h', 0.1) * h_full)
-                    
-                    search_margin = 80 # ±80 pixel arama alanı (~2-3 mm fiziki tolerans)
-                    sx1 = max(0, bx - search_margin)
-                    sy1 = max(0, by - search_margin)
-                    sx2 = min(w_full, bx + bw + search_margin)
-                    sy2 = min(h_full, by + bh + search_margin)
-                    
-                    search_gray = frame_gray[sy1:sy2, sx1:sx2]
-                    
-                    # Şablon boyutları arama alanından büyük / eşitse crash olmasını engelle
-                    th, tw = template_img.shape[:2]
-                    sh, sw = search_gray.shape[:2]
-                    if tw <= sw and th <= sh:
-                        res = cv2.matchTemplate(search_gray, template_img, cv2.TM_CCOEFF_NORMED)
-                        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-                        
-                        found_x = max_loc[0] + sx1
-                        found_y = max_loc[1] + sy1
-                        
-                        dx = found_x - bx
-                        dy = found_y - by
-                        
-                        if max_val > 0.6: # Güvenilir eşleşme
-                            emit('info', f"Auto-Align: Kayma düzeltildi (dx:{dx}px, dy:{dy}px) | Eşleşme: %{max_val*100:.1f}")
-                            log.info(f"Verification Auto-Align başarıyla uygulandı: dx={dx}, dy={dy}, val={max_val:.2f}")
-                        else:
-                            dx = 0
-                            dy = 0
-                            emit('warning', f"Auto-Align: Düşük güvenilirlik (%{max_val*100:.1f}), orijinal konumlar kullanılacak.")
-                    else:
-                        emit('warning', "Auto-Align: Arama alanı şablondan küçük, atlandı.")
-            except Exception as e:
-                log.error(f"Auto-Align hatası: {e}")
-                emit('warning', f"Auto-Align hatası: {e}. Orijinal konumlar kullanılacak.")
-
         # 3. ROI'leri analiz et
         img_h, img_w = thresh.shape[:2]
 
         for i, box in enumerate(boxes):
-            bx = int(box.get('x', 0) * img_w) + dx
-            by = int(box.get('y', 0) * img_h) + dy
+            bx = int(box.get('x', 0) * img_w)
+            by = int(box.get('y', 0) * img_h)
             bw = int(box.get('w', 0.1) * img_w)
             bh = int(box.get('h', 0.1) * img_h)
             name = box.get('name', 'Bilinmeyen')
