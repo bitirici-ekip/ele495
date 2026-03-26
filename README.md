@@ -4,7 +4,7 @@
 
 <p align="center">
   <b>ELE495 — Senior Design Project in Electronic Engineering</b><br>
-  <i>Ankara University · Department of Electrical-Electronics Engineering</i>
+  <i>TOBB ETU · Department of Electrical-Electronics Engineering</i>
 </p>
 
 <p align="center">
@@ -83,7 +83,7 @@ The system is composed of **three principal layers** communicating over serial (
 │         ├── STEP / STEPG commands (guarded emergency-stop)           │
 │         ├── AHOME  (autonomous homing with limit switch)             │
 │         ├── AROTATE (autonomous angle rotation)                      │
-│         ├── AREAD / MULTI_AREAD (analog measurements)               │
+│         ├── AREAD / MULTI_AREAD (analog measurements)                │
 │         └── DREAD / DWRITE / PMODE (GPIO control)                    │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -224,7 +224,7 @@ Test results feed directly into the **scenario engine**, enabling conditional br
 
 ## 📜 License
 
-This project was developed as a senior design project (ELE495) at Ankara University, Department of Electrical-Electronics Engineering.
+This project was developed as a senior design project (ELE495) at TOBB ETU, Department of Electrical-Electronics Engineering.
 
 ---
 
