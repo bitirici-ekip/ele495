@@ -18,6 +18,29 @@
 
 ---
 
+## 📸 Product Showcase
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/pnp_machine.jpg" alt="Pick and Place Machine — Final Product" width="100%" />
+      <br />
+      <b>Assembled Pick & Place Machine</b>
+      <br />
+      <sub>Custom-built 3-axis Cartesian gantry with aluminum V-slot frame, NEMA 17 stepper motors, GRBL CNC controller, vacuum nozzle assembly, integrated camera module, and 24 V power supply unit. The PCB work bed is visible at the bottom with a sample board loaded for component placement.</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/web_dashboard.png" alt="Web Control Dashboard — Live Operation" width="100%" />
+      <br />
+      <b>Real-Time Web Control Dashboard</b>
+      <br />
+      <sub>Live MJPEG camera feed with 10× PIP zoom, Tesseract OCR overlay, inline resistance measurement (21.97 kΩ), automated scenario execution (CRB YOLU — step 15/15), real-time verification results (R1: 94.64 %, D1: 100 %, D2: BOS, R2: 79.64 %), and manual motor jog controls — all served from the Raspberry Pi at 19 FPS.</sub>
+    </td>
+  </tr>
+</table>
+
+---
+
 ## 📌 Overview
 
 This project delivers a **web-based, autonomous control and testing system** for an industrial **Pick & Place (Surface-Mount) machine**. The system integrates hardware motion control, real-time computer vision, and an intelligent scenario engine on a single platform — enabling fully automated SMD component placement, inline electrical testing, and optical quality verification **without operator intervention**.
@@ -37,12 +60,28 @@ This project delivers a **web-based, autonomous control and testing system** for
 
 ## 👥 Team
 
-| Member |
-|---|
-| Şahin Yalgun |
-| Mehmet Egemen Çorbacı |
-| Mustafa Anıl Işık |
-| Aydın Eralp Sırmalı |
+<table>
+  <tr>
+    <th>Name</th>
+    <th>Student ID</th>
+  </tr>
+  <tr>
+    <td><b>Şahin Yalgun</b></td>
+    <td><code>211201037</code></td>
+  </tr>
+  <tr>
+    <td><b>Mehmet Egemen Çorbacı</b></td>
+    <td><code>211201026</code></td>
+  </tr>
+  <tr>
+    <td><b>Mustafa Anıl Işık</b></td>
+    <td><code>201204084</code></td>
+  </tr>
+  <tr>
+    <td><b>Aydın Eralp Sırmalı</b></td>
+    <td><code>201201067</code></td>
+  </tr>
+</table>
 
 ---
 
