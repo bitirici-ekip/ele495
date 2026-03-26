@@ -27,7 +27,7 @@
       <br />
       <b>Assembled Pick & Place Machine</b>
       <br />
-      <sub>Custom-built 3-axis Cartesian gantry with aluminum V-slot frame, NEMA 17 stepper motors, GRBL CNC controller, vacuum nozzle assembly, integrated camera module, and 24 V power supply unit. The PCB work bed is visible at the bottom with a sample board loaded for component placement.</sub>
+      <sub>Custom-built 3-axis Cartesian gantry with aluminum V-slot frame, NEMA 17 stepper motors, GRBL CNC controller, vacuum nozzle assembly, integrated camera module, and 12 V power supply unit. The PCB work bed is visible at the bottom with a sample board loaded for component placement.</sub>
     </td>
     <td align="center" width="50%">
       <img src="docs/web_dashboard.png" alt="Web Control Dashboard — Live Operation" width="100%" />
