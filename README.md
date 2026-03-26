@@ -100,6 +100,14 @@ The system is composed of **three principal layers** communicating over serial (
 
 ---
 
+<img width="1829" height="837" alt="bitirme_UI" src="https://github.com/user-attachments/assets/30f90115-32a2-40aa-b89f-868b8ffa1ee0" />
+
+---
+
+![bitirme_final](https://github.com/user-attachments/assets/2e753426-9948-452d-a116-1998a3c02ba2)
+
+---
+
 ## 📂 Repository Structure
 
 ```
@@ -128,7 +136,7 @@ ele495/
     ├── bases.json                     # Cartesian (XYZ) coordinate database
     ├── scenarios.json                 # Standard (sub-task) scenario definitions
     ├── master_scenarios.json          # End-to-end master production scenarios
-    └── verification.json             # Autonomous OCR quality-control parameters
+    └── verification.json              # Autonomous OCR quality-control parameters
 ```
 
 ---
